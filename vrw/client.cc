@@ -1,7 +1,7 @@
 // -*- mode: c++; c-file-style: "k&r"; c-basic-offset: 4 -*-
 /***********************************************************************
  *
- * vr/client.cc:
+ * vrw/client.cc:
  *   Viewstamped Replication clinet
  *
  * Copyright 2013-2016 Dan R. K. Ports  <drkp@cs.washington.edu>

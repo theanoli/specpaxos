@@ -1,7 +1,7 @@
 // -*- mode: c++; c-file-style: "k&r"; c-basic-offset: 4 -*-
 /***********************************************************************
  *
- * vr/replica.cc:
+ * vrw/replica.cc:
  *   Viewstamped Replication protocol
  *
  * Copyright 2013-2016 Dan R. K. Ports  <drkp@cs.washington.edu>
