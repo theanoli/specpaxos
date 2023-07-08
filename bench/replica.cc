@@ -35,6 +35,7 @@
 #include "spec/replica.h"
 #include "unreplicated/replica.h"
 #include "vr/replica.h"
+#include "vrw/replica.h"
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -69,6 +70,7 @@ main(int argc, char **argv)
         PROTO_UNKNOWN,
         PROTO_UNREPLICATED,
         PROTO_VR,
+        PROTO_VRW,
         PROTO_FASTPAXOS,
         PROTO_SPEC
     } proto = PROTO_UNKNOWN;
@@ -126,6 +128,8 @@ main(int argc, char **argv)
                 proto = PROTO_UNREPLICATED;
             } else if (strcasecmp(optarg, "vr") == 0) {
                 proto = PROTO_VR;
+            } else if (strcasecmp(optarg, "vrw") == 0) {
+                proto = PROTO_VRW;
             } else if (strcasecmp(optarg, "fastpaxos") == 0) {
                 proto = PROTO_FASTPAXOS;
             } else if (strcasecmp(optarg, "spec") == 0) {
@@ -220,6 +224,14 @@ main(int argc, char **argv)
         
     case PROTO_VR:
         replica = new specpaxos::vr::VRReplica(config, index,
+                                               !recover,
+                                               &transport,
+                                               batchSize,
+                                               nullApp);
+        break;
+
+    case PROTO_VRW:
+        replica = new specpaxos::vrw::VRWReplica(config, index,
                                                !recover,
                                                &transport,
                                                batchSize,

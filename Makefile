@@ -132,6 +132,7 @@ include lib/Rules.mk
 include common/Rules.mk
 include unreplicated/Rules.mk
 include vr/Rules.mk
+include vrw/Rules.mk
 include fastpaxos/Rules.mk
 include spec/Rules.mk
 include bench/Rules.mk

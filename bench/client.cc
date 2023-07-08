@@ -39,6 +39,7 @@
 #include "spec/client.h"
 #include "unreplicated/client.h"
 #include "vr/client.h"
+#include "vrw/client.h"
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -47,7 +48,7 @@
 static void
 Usage(const char *progName)
 {
-        fprintf(stderr, "usage: %s [-n requests] [-t threads] [-w warmup-secs] [-l latency-file] [-q dscp] [-d delay-ms] -c conf-file -m unreplicated|vr|fastpaxos|spec\n",
+        fprintf(stderr, "usage: %s [-n requests] [-t threads] [-w warmup-secs] [-l latency-file] [-q dscp] [-d delay-ms] -c conf-file -m unreplicated|vr|vrw|fastpaxos|spec\n",
                 progName);
         exit(1);
 }
@@ -72,6 +73,7 @@ int main(int argc, char **argv)
         PROTO_UNKNOWN,
         PROTO_UNREPLICATED,
         PROTO_VR,
+        PROTO_VRW,
         PROTO_FASTPAXOS,
         PROTO_SPEC
     } proto = PROTO_UNKNOWN;
@@ -122,6 +124,8 @@ int main(int argc, char **argv)
                 proto = PROTO_UNREPLICATED;
             } else if (strcasecmp(optarg, "vr") == 0) {
                 proto = PROTO_VR;
+            } else if (strcasecmp(optarg, "vrw") == 0) {
+                proto = PROTO_VRW;
             } else if (strcasecmp(optarg, "fastpaxos") == 0) {
                 proto = PROTO_FASTPAXOS;
             } else if (strcasecmp(optarg, "spec") == 0) {
@@ -215,6 +219,10 @@ int main(int argc, char **argv)
         
         case PROTO_VR:
             client = new specpaxos::vr::VRClient(config, &transport);
+            break;
+
+        case PROTO_VRW:
+            client = new specpaxos::vrw::VRWClient(config, &transport);
             break;
 
         case PROTO_FASTPAXOS:

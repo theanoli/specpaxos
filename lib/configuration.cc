@@ -147,6 +147,10 @@ Configuration::Configuration(std::ifstream &file)
     if (n == 0) {
         Panic("Configuration did not specify any replicas");
     }
+	
+	if (n % 2 == 0) {
+		Panic("No support (yet) for even number of replicas!"); 
+	}
 
     if (f == -1) {
         Panic("Configuration did not specify a 'f' parameter");
