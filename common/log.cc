@@ -133,10 +133,34 @@ Log::RemoveAfter(opnum_t op)
 
     Debug("Removing log entries after " FMT_OPNUM, op);
 
-    ASSERT(op-start < entries.size());
+    ASSERT(op - start < entries.size());
     entries.resize(op-start);
 
     ASSERT(LastOpnum() == op-1);
+}
+
+// TODO Check valid values of start
+void
+Log::RemoveUpTo(opnum_t op)
+{
+    if (useHash) {
+        Panic("Log::RemoveUpTo on hashed log not supported.");
+    }
+
+	ASSERT(op >= start);
+
+    Debug("Removing log entries before " FMT_OPNUM, op);
+	while (start <= op) {
+		// Shouldn't erase uncommitted entries---everyone should have committed
+		// these already!
+		ASSERT(entries.begin()->state == LOG_STATE_COMMITTED);
+		entries.erase(entries.begin());	
+		start++;
+		ASSERT(entries.begin()->viewstamp.opnum == start);
+	}
+
+	ASSERT(entries.begin()->viewstamp.opnum == op + 1);
+	Notice("New log size: " FMT_OPNUM, entries.size());
 }
 
 LogEntry *

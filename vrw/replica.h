@@ -38,6 +38,7 @@
 #include "common/quorumset.h"
 #include "vrw/vrw-proto.pb.h"
 
+#include <limits>
 #include <map>
 #include <memory>
 #include <list>
@@ -69,6 +70,9 @@ private:
     int batchSize;
     opnum_t lastBatchEnd;
     bool batchComplete;
+
+	opnum_t cleanUpTo;
+	std::vector<opnum_t> lastCommitteds; 
     
     Log log;
     std::map<uint64_t, std::unique_ptr<TransportAddress> > clientAddresses;
@@ -97,6 +101,7 @@ private:
 
     uint64_t GenerateNonce() const;
     bool AmLeader() const;
+	bool IsWitness(int idx) const;
 	bool AmWitness() const;
     void CommitUpTo(opnum_t upto);
     void SendPrepareOKs(opnum_t oldLastOp);
@@ -108,6 +113,8 @@ private:
     void UpdateClientTable(const Request &req);
     void ResendPrepare();
     void CloseBatch();
+	opnum_t GetLowestReplicaCommit();
+	void CleanLog();
     
     void HandleRequest(const TransportAddress &remote,
                        const proto::RequestMessage &msg);

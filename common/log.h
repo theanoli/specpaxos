@@ -94,6 +94,7 @@ public:
     bool SetStatus(opnum_t opnum, LogEntryState state);
     bool SetRequest(opnum_t op, const Request &req);
     void RemoveAfter(opnum_t opnum);
+    void RemoveUpTo(opnum_t opnum);
     LogEntry * Last();
     viewstamp_t LastViewstamp() const; // deprecated
     opnum_t LastOpnum() const;

@@ -57,6 +57,7 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
                      AppReplica *app)
     : Replica(config, myIdx, initialize, transport, app),
       batchSize(batchSize),
+	  lastCommitteds(config.n, 0),
       log(false),
       prepareOKQuorum(config.QuorumSize()-1),
       startViewChangeQuorum(config.QuorumSize()-1),
@@ -71,6 +72,8 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
     this->lastRequestStateTransferOpnum = 0;
     lastBatchEnd = 0;
     batchComplete = true;
+
+	this->cleanUpTo = 0;
 
     if (batchSize > 1) {
         Notice("Batching enabled; batch size %d", batchSize);
@@ -148,9 +151,15 @@ VRWReplica::AmLeader() const
 }
 
 bool
+VRWReplica::IsWitness(int idx) const
+{
+	return (idx % 2 == 1); 
+}
+
+bool
 VRWReplica::AmWitness() const
 {
-       return (this->myIdx % 2 == 1); 
+       return (IsWitness(this->myIdx)); 
 }
 
 void
@@ -200,8 +209,6 @@ VRWReplica::CommitUpTo(opnum_t upto)
 		}
 
         /* Mark it as committed */
-		// TODO verify this is in the right place! This was previously before the code updating
-		// the ClientTableEntry
         log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
 
         Latency_End(&executeAndReplyLatency);
@@ -229,6 +236,7 @@ VRWReplica::SendPrepareOKs(opnum_t oldLastOp)
         reply.set_view(view);
         reply.set_opnum(i);
         reply.set_replicaidx(myIdx);
+		reply.set_lastcommitted(AmWitness()? std::numeric_limits<opnum_t>::max() : lastCommitted);
 
         RDebug("Sending PREPAREOK " FMT_VIEWSTAMP " for new uncommitted operation",
                reply.view(), reply.opnum());
@@ -390,7 +398,8 @@ VRWReplica::CloseBatch()
     p.set_view(view);
     p.set_opnum(lastOp);
     p.set_batchstart(batchStart);
-
+	p.set_cleanupto(GetLowestReplicaCommit()); 
+	
     for (opnum_t i = batchStart; i <= lastOp; i++) {
         Request *r = p.add_request();
         const LogEntry *entry = log.Find(i);
@@ -628,6 +637,15 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
         RPanic("Unexpected PREPARE: I'm the leader of this view");
     }
 
+	if (msg.cleanupto() > cleanUpTo) {
+		// Clean log up to the lowest committed entry by any replica
+		cleanUpTo = msg.cleanupto();
+		CleanLog(); 
+	} else if (msg.cleanupto() < cleanUpTo) {
+		RPanic("cleanUpTo decreased! Got " FMT_OPNUM ", had " FMT_OPNUM, 
+				msg.cleanupto(), cleanUpTo);
+	}
+
     ASSERT(msg.batchstart() <= msg.opnum());
     ASSERT_EQ(msg.opnum()-msg.batchstart()+1, (unsigned)msg.request_size());
               
@@ -640,6 +658,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
         reply.set_view(msg.view());
         reply.set_opnum(msg.opnum());
         reply.set_replicaidx(myIdx);
+		reply.set_lastcommitted(AmWitness()? std::numeric_limits<opnum_t>::max() : lastCommitted);
         if (!(transport->SendMessageToReplica(this,
                                               configuration.GetLeaderIndex(view),
                                               reply))) {
@@ -673,6 +692,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
     reply.set_view(msg.view());
     reply.set_opnum(msg.opnum());
     reply.set_replicaidx(myIdx);
+	reply.set_lastcommitted(AmWitness()? std::numeric_limits<opnum_t>::max() : lastCommitted);
     
     if (!(transport->SendMessageToReplica(this,
                                           configuration.GetLeaderIndex(view),
@@ -709,6 +729,19 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
         RWarning("Ignoring PREPAREOK because I'm not the leader");
         return;        
     }
+
+	/* 
+	 * The leader needs to figure out the lowest commit number among replicas. 
+	 * It should maintain a vector of the current lastCommitteds of the replicas, 
+	 * and then update as replicas make progress.
+	 */
+	try {
+		opnum_t replicaLastRecordedCommit = lastCommitteds.at(msg.replicaidx());
+		ASSERT(replicaLastRecordedCommit <= msg.lastcommitted());
+		lastCommitteds.at(msg.replicaidx()) = msg.lastcommitted();
+	} catch (std::out_of_range const& exc) {
+		RPanic("Tried to access an element that was out of range in lastCommitteds!");
+	}
     
     viewstamp_t vs = { msg.view(), msg.opnum() };
     if (auto msgs =
@@ -1204,6 +1237,22 @@ VRWReplica::HandleRecoveryResponse(const TransportAddress &remote,
         lastOp = leaderResponse->second.lastop();
         CommitUpTo(leaderResponse->second.lastcommitted());
     }
+}
+
+opnum_t
+VRWReplica::GetLowestReplicaCommit()
+{
+	opnum_t lowest = *std::min_element(lastCommitteds.begin(), lastCommitteds.end()); 
+	return lowest;
+}
+
+void
+VRWReplica::CleanLog()
+{
+	/* 
+	 * Truncate the log up to the current cleanUpTo value.
+	 */
+	log.RemoveUpTo(cleanUpTo);
 }
 
 } // namespace specpaxos::vrw
