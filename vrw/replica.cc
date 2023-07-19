@@ -81,7 +81,11 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
 
     this->viewChangeTimeout = new Timeout(transport, 5000, [this,myIdx]() {
             RWarning("Have not heard from leader; starting view change");
-            StartViewChange(view+2);
+			view_t step = 1;
+			while (IsWitness(configuration.GetLeaderIndex(view + step))) {
+				step += 1; 
+			}
+            StartViewChange(view + step);
         });
     this->nullCommitTimeout = new Timeout(transport, 1000, [this]() {
             SendNullCommit();
@@ -150,6 +154,7 @@ VRWReplica::AmLeader() const
     return (configuration.GetLeaderIndex(view) == myIdx);
 }
 
+// Odd nodes are witnesses
 bool
 VRWReplica::IsWitness(int idx) const
 {
@@ -159,7 +164,7 @@ VRWReplica::IsWitness(int idx) const
 bool
 VRWReplica::AmWitness() const
 {
-       return (IsWitness(this->myIdx)); 
+       return (IsWitness(myIdx)); 
 }
 
 void
@@ -319,7 +324,7 @@ void
 VRWReplica::StartViewChange(view_t newview)
 {
     RNotice("Starting view change for view " FMT_VIEW, newview);
-	ASSERT(newview % 2 == 0);
+	ASSERT(!IsWitness(configuration.GetLeaderIndex(newview)));
 
     view = newview;
     status = STATUS_VIEW_CHANGE;
@@ -541,6 +546,8 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
     // Leader Upcall
     bool replicate = false;
     string res;
+	// TS: LeaderUpcall is basically a no-op for all example ops: it checks if the op should 
+	// be replicated and copies the op into res. 
     LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
     ClientTableEntry &cte =
         clientTable[msg.req().clientid()];
@@ -636,6 +643,10 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
     if (AmLeader()) {
         RPanic("Unexpected PREPARE: I'm the leader of this view");
     }
+
+	if (msg.cleanupto() > lastCommitted) {
+		RPanic("Asking me to clean an entry after my lastCommitted!");
+	}
 
 	if (msg.cleanupto() > cleanUpTo) {
 		// Clean log up to the lowest committed entry by any replica
@@ -999,7 +1010,7 @@ void
 VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                               const DoViewChangeMessage &msg)
 {
-    RDebug("Received DOVIEWCHANGE " FMT_VIEW " from replica %d, "
+    RNotice("Received DOVIEWCHANGE " FMT_VIEW " from replica %d, "
            "lastnormalview=" FMT_VIEW " op=" FMT_OPNUM " committed=" FMT_OPNUM,
            msg.view(), msg.replicaidx(),
            msg.lastnormalview(), msg.lastop(), msg.lastcommitted());
