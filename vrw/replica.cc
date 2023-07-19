@@ -83,7 +83,7 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
             RWarning("Have not heard from leader; starting view change");
 			view_t step = 1;
 			while (IsWitness(configuration.GetLeaderIndex(view + step))) {
-				step += 1; 
+				step++; 
 			}
             StartViewChange(view + step);
         });
