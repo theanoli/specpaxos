@@ -69,7 +69,7 @@ protected:
     Configuration *config;
 
     virtual void SetUp() {
-        vector<ReplicaAddress> replicaAddrs = { { "localhost", "12345" },
+		std::vector<ReplicaAddress> replicaAddrs = { { "localhost", "12345" },
                                                 { "localhost", "12346" },
                                                 { "localhost", "12347" }};
         config = new Configuration(3, 1, replicaAddrs);
@@ -147,7 +147,7 @@ protected:
         }
 
         // Do the merge
-        vector<LogEntry> out;
+		std::vector<LogEntry> out;
         replica->MergeLogs(tc.newview(), 0, dvcs, out);
 
         // Check it against the expected result

@@ -163,6 +163,12 @@ Log::RemoveUpTo(opnum_t op)
 	Notice("New log size: " FMT_OPNUM, entries.size());
 }
 
+size_t
+Log::Size()
+{
+	return entries.size(); 
+}
+
 LogEntry *
 Log::Last()
 {

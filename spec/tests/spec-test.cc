@@ -196,7 +196,7 @@ TEST_F(SpecTest, Unlogged)
     ClientSendNextUnlogged(1, upcall, timeout);
     transport->Run();
 
-    for (int i = 0; i < apps.size(); i++) {
+    for (size_t i = 0; i < apps.size(); i++) {
         EXPECT_EQ(0, apps[i]->ops.size());
         EXPECT_EQ((i == 1 ? 1 : 0), apps[i]->unloggedOps.size());
     }
@@ -232,7 +232,7 @@ TEST_F(SpecTest, UnloggedTimeout)
     ClientSendNextUnlogged(1, upcall, timeout);
     transport->Run();
 
-    for (int i = 0; i < apps.size(); i++) {
+    for (size_t i = 0; i < apps.size(); i++) {
         EXPECT_EQ(0, apps[i]->ops.size());
         EXPECT_EQ(0, apps[i]->unloggedOps.size());
     }

@@ -252,6 +252,9 @@ test: $(TEST_BINS:%=run-%)
 .PHONY: check
 check: test
 
+.PHONY: buildtest
+buildtest: $(TEST_BINS)
+
 .PHONY: TAGS
 TAGS:
 	$(Q)rm -f $@

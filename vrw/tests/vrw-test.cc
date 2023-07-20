@@ -189,8 +189,11 @@ TEST_P(VRWTest, Unlogged)
     ClientSendNextUnlogged(2, upcall, timeout);
     transport->Run();
 
-    for (int i = 0; i < apps.size(); i += 2) {
+    for (size_t i = 0; i < apps.size(); i += 2) {
         EXPECT_EQ(0, apps[i]->ops.size());
+	}
+
+    for (size_t i = 0; i < apps.size(); i++) {
         EXPECT_EQ((i == 2 ? 1 : 0), apps[i]->unloggedOps.size());
     }
     EXPECT_EQ(0, timeouts);
@@ -207,7 +210,7 @@ TEST_P(VRWTest, UnloggedTimeout)
         timeouts++;
     };
 
-    // Drop messages to or from replica 1
+    // Drop messages to or from replica 2 (i.e., non-witness)
     transport->AddFilter(10, [](TransportReceiver *src, int srcIdx,
                                 TransportReceiver *dst, int dstIdx,
                                 Message &m, uint64_t &delay) {
@@ -225,7 +228,7 @@ TEST_P(VRWTest, UnloggedTimeout)
     ClientSendNextUnlogged(2, upcall, timeout);
     transport->Run();
 
-    for (int i = 0; i < apps.size(); i+=2) {
+    for (size_t i = 0; i < apps.size(); i++) {
         EXPECT_EQ(0, apps[i]->ops.size());
         EXPECT_EQ(0, apps[i]->unloggedOps.size());
     }
@@ -260,6 +263,8 @@ TEST_P(VRWTest, ManyOps)
             EXPECT_EQ(RequestOp(j), apps[i]->ops[j]);            
         }
     }
+
+	// TODO check the log size. It should be quite short (TODO how short?)
 }
 
 TEST_P(VRWTest, FailedReplica)
@@ -293,19 +298,27 @@ TEST_P(VRWTest, FailedReplica)
     
     transport->Run();
 
-    // By now, they all should have executed the last request.
+    // By now, they all should have executed the last request (except
+	// the "failed" replica)
     for (int i = 0; i < config->n; i += 2) {
         if (i == 2) {
-            continue;
-        }
-        EXPECT_EQ(10, apps[i]->ops.size());
-        for (int j = 0; j < 10; j++) {
-            EXPECT_EQ(RequestOp(j), apps[i]->ops[j]);            
-        }
+            EXPECT_EQ(0, apps[i]->ops.size());
+			EXPECT_EQ(0, replicas[i]->GetLogSize());
+        } else {
+			if (!(i % 2)) {
+				// Replicas should have executed these ops
+				EXPECT_EQ(10, apps[i]->ops.size());
+				for (int j = 0; j < 10; j++) {
+					EXPECT_EQ(RequestOp(j), apps[i]->ops[j]);            
+				}
+			} else {
+				// Non-failed replicas and witnesses should have full log
+				EXPECT_EQ(10, replicas[i]->GetLogSize());
+			}
+		}
     }
 }
 
-// TODO check this---originally dropped messages from replica 1.
 TEST_P(VRWTest, StateTransfer)
 {
     Client::continuation_t upcall = [&](const string &req, const string &reply) {
@@ -330,7 +343,8 @@ TEST_P(VRWTest, StateTransfer)
     
     ClientSendNext(upcall);
 
-    // Drop messages to or from replica 2
+    // Drop messages to or from replica 2 (this kicks in before any messages are 
+	// sent/received to any nodes)
     transport->AddFilter(10, [](TransportReceiver *src, int srcIdx,
                                 TransportReceiver *dst, int dstIdx,
                                 Message &m, uint64_t &delay) {
@@ -343,11 +357,14 @@ TEST_P(VRWTest, StateTransfer)
     transport->Run();
 
     // By now, they all should have executed the last request.
-    for (int i = 0; i < config->n; i += 2) {
-        EXPECT_EQ(10, apps[i]->ops.size());
-        for (int j = 0; j < 10; j++) {
-            EXPECT_EQ(RequestOp(j), apps[i]->ops[j]);            
-        }
+    for (int i = 0; i < config->n; i++) {
+		if (!(i % 2)) {
+			EXPECT_EQ(10, apps[i]->ops.size());
+			for (int j = 0; j < 10; j++) {
+				EXPECT_EQ(RequestOp(j), apps[i]->ops[j]);            
+			}
+		}
+		EXPECT_EQ(2, replicas[i]->GetLogSize());
     }
 }
 
@@ -635,6 +652,7 @@ TEST_P(VRWTest, Stress)
     }
 }
 
+// Parameter here is the batch size
 INSTANTIATE_TEST_CASE_P(Batching,
                         VRWTest,
                         ::testing::Values(1, 8));

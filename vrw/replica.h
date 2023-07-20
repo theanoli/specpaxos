@@ -56,6 +56,7 @@ public:
     
     void ReceiveMessage(const TransportAddress &remote,
                         const string &type, const string &data);
+	size_t GetLogSize();  // For testing
 
 private:
     view_t view;

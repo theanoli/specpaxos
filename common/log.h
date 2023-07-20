@@ -95,6 +95,7 @@ public:
     bool SetRequest(opnum_t op, const Request &req);
     void RemoveAfter(opnum_t opnum);
     void RemoveUpTo(opnum_t opnum);
+	size_t Size();
     LogEntry * Last();
     viewstamp_t LastViewstamp() const; // deprecated
     opnum_t LastOpnum() const;

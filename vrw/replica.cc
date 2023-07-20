@@ -423,6 +423,15 @@ VRWReplica::CloseBatch()
     
     resendPrepareTimeout->Reset();
     closeBatchTimeout->Stop();
+
+	if (p.cleanupto() > cleanUpTo) {
+		// Clean log up to the lowest committed entry by any replica
+		cleanUpTo = p.cleanupto();
+		CleanLog(); 
+	} else if (p.cleanupto() < cleanUpTo) {
+		RPanic("cleanUpTo decreased! Got " FMT_OPNUM ", had " FMT_OPNUM, 
+				p.cleanupto(), cleanUpTo);
+	}
 }
 
 void
@@ -767,6 +776,7 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
          * This also notifies the client of the result.
          */
         CommitUpTo(msg.opnum());
+		lastCommitteds.at(myIdx) = lastCommitted;
 
         if (msgs->size() >= (unsigned)configuration.QuorumSize()) {
             return;
@@ -1010,7 +1020,7 @@ void
 VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                               const DoViewChangeMessage &msg)
 {
-    RNotice("Received DOVIEWCHANGE " FMT_VIEW " from replica %d, "
+    RDebug("Received DOVIEWCHANGE " FMT_VIEW " from replica %d, "
            "lastnormalview=" FMT_VIEW " op=" FMT_OPNUM " committed=" FMT_OPNUM,
            msg.view(), msg.replicaidx(),
            msg.lastnormalview(), msg.lastop(), msg.lastcommitted());
@@ -1253,6 +1263,9 @@ VRWReplica::HandleRecoveryResponse(const TransportAddress &remote,
 opnum_t
 VRWReplica::GetLowestReplicaCommit()
 {
+	for (size_t i = 0; i < lastCommitteds.size(); i++) {
+		RNotice("Replica %zu has lastCommitted " FMT_OPNUM, i, lastCommitteds[i]);
+	}
 	opnum_t lowest = *std::min_element(lastCommitteds.begin(), lastCommitteds.end()); 
 	return lowest;
 }
@@ -1263,7 +1276,14 @@ VRWReplica::CleanLog()
 	/* 
 	 * Truncate the log up to the current cleanUpTo value.
 	 */
+	RNotice("Cleaning up to " FMT_OPNUM, cleanUpTo);
 	log.RemoveUpTo(cleanUpTo);
+}
+
+size_t
+VRWReplica::GetLogSize()
+{
+	return log.Size();
 }
 
 } // namespace specpaxos::vrw
