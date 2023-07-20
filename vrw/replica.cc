@@ -241,7 +241,7 @@ VRWReplica::SendPrepareOKs(opnum_t oldLastOp)
         reply.set_view(view);
         reply.set_opnum(i);
         reply.set_replicaidx(myIdx);
-		reply.set_lastcommitted(AmWitness()? std::numeric_limits<opnum_t>::max() : lastCommitted);
+		reply.set_lastcommitted(lastCommitted);
 
         RDebug("Sending PREPAREOK " FMT_VIEWSTAMP " for new uncommitted operation",
                reply.view(), reply.opnum());
@@ -678,7 +678,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
         reply.set_view(msg.view());
         reply.set_opnum(msg.opnum());
         reply.set_replicaidx(myIdx);
-		reply.set_lastcommitted(AmWitness()? std::numeric_limits<opnum_t>::max() : lastCommitted);
+		reply.set_lastcommitted(lastCommitted);
         if (!(transport->SendMessageToReplica(this,
                                               configuration.GetLeaderIndex(view),
                                               reply))) {
@@ -688,6 +688,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
     }
 
     if (msg.batchstart() > this->lastOp+1) {
+		RNotice("Requesting state transfer in HandlePrepare");
         RequestStateTransfer();
         pendingPrepares.push_back(std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
         return;
@@ -712,7 +713,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
     reply.set_view(msg.view());
     reply.set_opnum(msg.opnum());
     reply.set_replicaidx(myIdx);
-	reply.set_lastcommitted(AmWitness()? std::numeric_limits<opnum_t>::max() : lastCommitted);
+	reply.set_lastcommitted(lastCommitted);
     
     if (!(transport->SendMessageToReplica(this,
                                           configuration.GetLeaderIndex(view),
@@ -841,6 +842,7 @@ VRWReplica::HandleCommit(const TransportAddress &remote,
     }
 
     if (msg.opnum() > this->lastOp) {
+		RNotice("Requesting state transfer in HandleCommit");
         RequestStateTransfer();
         return;
     }
@@ -1123,6 +1125,18 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         if (latestMsg != NULL) {
             CommitUpTo(latestMsg->lastcommitted());
         }
+
+		// When a new leader comes up, it will start sending around cleanUpTo messages.
+		// It is SAFE to send around a cleanUpTo of 0, since it will be a no-op on replicas.
+		// It is also safe to send around the new leader's cleanUpTo, since cleaning 
+		// up to that value was safe before it became the leader. We can also use this 
+		// value as the lastCommitted for each node in the lastCommitteds list; the true
+		// lastCommitted of each node is not less than this value, because otherwise we 
+		// could not have chosen this value as the cleanUpTo. If the lastCommitted of a node
+		// is equal, no-op. If it is greater, then we will update it on the next PrepareOK round.
+		for (size_t i = 0; i < lastCommitteds.size(); i++) {
+			lastCommitteds[i] = cleanUpTo;
+		}
 
         // Send a STARTVIEW message with the new log
         StartViewMessage sv;

@@ -149,7 +149,8 @@ Log::RemoveUpTo(opnum_t op)
 
 	ASSERT(op >= start);
 
-    Debug("Removing log entries before " FMT_OPNUM, op);
+    Debug("Removing log entries up to " FMT_OPNUM "; start is " FMT_OPNUM, op, start);
+	ASSERT(entries.begin()->viewstamp.opnum == start);
 	while (start <= op) {
 		// Shouldn't erase uncommitted entries---everyone should have committed
 		// these already!
