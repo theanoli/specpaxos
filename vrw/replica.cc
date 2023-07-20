@@ -978,7 +978,7 @@ VRWReplica::HandleStartViewChange(const TransportAddress &remote,
 
     if ((status != STATUS_VIEW_CHANGE) || (msg.view() > view)) {
         RWarning("Received StartViewChange for view " FMT_VIEW
-                 "from replica %d", msg.view(), msg.replicaidx());
+                 " from replica %d", msg.view(), msg.replicaidx());
         StartViewChange(msg.view());
     }
 
@@ -1041,7 +1041,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         // It's superfluous to send the StartViewChange messages here,
         // but harmless...
         RWarning("Received DoViewChange for view " FMT_VIEW
-                 "from replica %d", msg.view(), msg.replicaidx());
+                 " from replica %d", msg.view(), msg.replicaidx());
         StartViewChange(msg.view());
     }
 
