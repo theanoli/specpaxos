@@ -74,7 +74,7 @@ public:
 
 };
 
-class VRWTest : public  ::testing::TestWithParam<int>
+class VRWTest : public  ::testing::TestWithParam<std::pair<int, int>>
 {
 protected:
     std::vector<VRWTestApp *> apps;
@@ -85,17 +85,24 @@ protected:
     int requestNum;
     
     virtual void SetUp() {
-        std::vector<ReplicaAddress> replicaAddrs =
-            { { "localhost", "12345" },
-              { "localhost", "12346" },
-              { "localhost", "12347" }};
-        config = new Configuration(3, 1, replicaAddrs);
+		int n = GetParam().first;
+		int f = n/2;
+		int batchSize = GetParam().second;
+
+		int port = 12345;
+
+		std::vector<ReplicaAddress> replicaAddrs; 
+		for (int i = 0; i < n; i++) {
+			std::string portStr = std::to_string(port + i);
+			replicaAddrs.push_back({"localhost", portStr});
+		}
+        config = new Configuration(n, f, replicaAddrs);
 
         transport = new SimulatedTransport();
         
         for (int i = 0; i < config->n; i++) {
             apps.push_back(new VRWTestApp());
-            replicas.push_back(new VRWReplica(*config, i, true, transport, GetParam(), apps[i])); 
+            replicas.push_back(new VRWReplica(*config, i, true, transport, batchSize, apps[i])); 
         }
 
         client = new VRWClient(*config, transport);
@@ -655,4 +662,7 @@ TEST_P(VRWTest, Stress)
 // Parameter here is the batch size
 INSTANTIATE_TEST_CASE_P(Batching,
                         VRWTest,
-                        ::testing::Values(1, 8));
+                        ::testing::Values(std::pair<int, int>(3, 1), 
+							std::pair<int, int>(3, 8), 
+							std::pair<int, int>(5, 1),
+							std::pair<int, int>(5, 8)));
