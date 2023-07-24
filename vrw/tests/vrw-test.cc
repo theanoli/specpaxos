@@ -37,6 +37,7 @@
 #include "common/replica.h"
 #include "vrw/client.h"
 #include "vrw/replica.h"
+#include "vrw/witness.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -78,7 +79,7 @@ class VRWTest : public  ::testing::TestWithParam<std::pair<int, int>>
 {
 protected:
     std::vector<VRWTestApp *> apps;
-    std::vector<VRWReplica *> replicas;
+    std::vector<Replica *> replicas;
     VRWClient *client;
     SimulatedTransport *transport;
     Configuration *config;
@@ -102,7 +103,11 @@ protected:
         
         for (int i = 0; i < config->n; i++) {
             apps.push_back(new VRWTestApp());
-            replicas.push_back(new VRWReplica(*config, i, true, transport, batchSize, apps[i])); 
+			if (IsWitness(i)) {
+				replicas.push_back(new VRWWitness(*config, i, true, transport, batchSize, apps[i])); 
+			} else {
+				replicas.push_back(new VRWReplica(*config, i, true, transport, batchSize, apps[i]));
+			}
         }
 
         client = new VRWClient(*config, transport);
@@ -170,7 +175,10 @@ TEST_P(VRWTest, OneOp)
 
     // By now, they all should have executed the last request, except the 
 	// witnesses.
-    for (int i = 0; i < config->n; i += 2) {
+    for (int i = 0; i < config->n; i++) {
+		if (IsWitness(i)) {
+			continue;
+		}
 		EXPECT_EQ(apps[i]->ops.size(), 1);
 		EXPECT_EQ(apps[i]->ops.back(),  LastRequestOp());
     }
@@ -196,7 +204,10 @@ TEST_P(VRWTest, Unlogged)
     ClientSendNextUnlogged(2, upcall, timeout);
     transport->Run();
 
-    for (size_t i = 0; i < apps.size(); i += 2) {
+    for (size_t i = 0; i < apps.size(); i++) {
+		if (IsWitness(i)) {
+			continue;
+		}
         EXPECT_EQ(0, apps[i]->ops.size());
 	}
 
@@ -307,20 +318,22 @@ TEST_P(VRWTest, FailedReplica)
 
     // By now, they all should have executed the last request (except
 	// the "failed" replica)
-    for (int i = 0; i < config->n; i += 2) {
+    for (int i = 0; i < config->n; i++) {
         if (i == 2) {
             EXPECT_EQ(0, apps[i]->ops.size());
-			EXPECT_EQ(0, replicas[i]->GetLogSize());
+			EXPECT_EQ(0, static_cast<VRWReplica *>(replicas[i])->GetLogSize());
         } else {
-			if (!(i % 2)) {
+			if (!IsWitness(i)) {
 				// Replicas should have executed these ops
 				EXPECT_EQ(10, apps[i]->ops.size());
 				for (int j = 0; j < 10; j++) {
 					EXPECT_EQ(RequestOp(j), apps[i]->ops[j]);            
 				}
+				// Non-failed replicas should have full log
+				EXPECT_EQ(10, static_cast<VRWReplica *>(replicas[i])->GetLogSize());
 			} else {
-				// Non-failed replicas and witnesses should have full log
-				EXPECT_EQ(10, replicas[i]->GetLogSize());
+				// Witnesses should have full log
+				EXPECT_EQ(10, static_cast<VRWWitness *>(replicas[i])->GetLogSize());
 			}
 		}
     }
@@ -365,13 +378,15 @@ TEST_P(VRWTest, StateTransfer)
 
     // By now, they all should have executed the last request.
     for (int i = 0; i < config->n; i++) {
-		if (!(i % 2)) {
+		if (!IsWitness(i)) {
 			EXPECT_EQ(10, apps[i]->ops.size());
 			for (int j = 0; j < 10; j++) {
 				EXPECT_EQ(RequestOp(j), apps[i]->ops[j]);            
 			}
+			EXPECT_EQ(2, static_cast<VRWReplica *>(replicas[i])->GetLogSize());
+		} else {
+			EXPECT_EQ(2, static_cast<VRWWitness *>(replicas[i])->GetLogSize());
 		}
-		EXPECT_EQ(2, replicas[i]->GetLogSize());
     }
 }
 
@@ -405,7 +420,10 @@ TEST_P(VRWTest, FailedLeader)
     transport->Run();
 
     // By now, they all should have executed the last request.
-    for (int i = 0; i < config->n; i += 2) {
+    for (int i = 0; i < config->n; i++) {
+		if (IsWitness(i)) {
+			continue;
+		}
         if (i == 0) {
             continue;
         }
@@ -447,7 +465,10 @@ TEST_P(VRWTest, DroppedReply)
     EXPECT_TRUE(received);
     
     // Each replica should have executed only one request
-    for (int i = 0; i < config->n; i += 2) {
+    for (int i = 0; i < config->n; i++) {
+		if (IsWitness(i)) {
+			continue;
+		}
         EXPECT_EQ(1, apps[i]->ops.size());
    }
 }
@@ -495,7 +516,10 @@ TEST_P(VRWTest, DroppedReplyThenFailedLeader)
     
     // Each replica should have executed only one request
     // (and actually the faulty one should too, but don't check that)
-    for (int i = 0; i < config->n; i += 2) {
+    for (int i = 0; i < config->n; i++) {
+		if (IsWitness(i)) {
+			continue;
+		}
         if (i != 0) {
             EXPECT_EQ(1, apps[i]->ops.size());            
         }
@@ -530,12 +554,18 @@ TEST_P(VRWTest, ManyClients)
 
     transport->Run();
 
-    for (int i = 0; i < config->n; i += 2) {
+    for (int i = 0; i < config->n; i++) {
+		if (IsWitness(i)) {
+			continue;
+		}
         ASSERT_EQ(NUM_CLIENTS * MAX_REQS, apps[i]->ops.size());
     }
 
     for (int i = 0; i < NUM_CLIENTS*MAX_REQS; i++) {
-        for (int j = 0; j < config->n; j += 2) {
+        for (int j = 0; j < config->n; j++) {
+			if (IsWitness(j)) {
+				continue;
+			}
             ASSERT_EQ(apps[0]->ops[i], apps[j]->ops[i]);
         }
     }
@@ -644,12 +674,18 @@ TEST_P(VRWTest, Stress)
 
     transport->Run();
 
-    for (int i = 0; i < config->n; i += 2) {
+    for (int i = 0; i < config->n; i++) {
+		if (IsWitness(i)) {
+			continue;
+		}
         ASSERT_EQ(NUM_CLIENTS * MAX_REQS, apps[i]->ops.size());
     }
 
     for (int i = 0; i < NUM_CLIENTS*MAX_REQS; i++) {
-        for (int j = 0; j < config->n; j += 2) {
+        for (int j = 0; j < config->n; j++) {
+			if (IsWitness(j)) {
+				continue;
+			}
             ASSERT_EQ(apps[0]->ops[i], apps[j]->ops[i]);
         }
     }

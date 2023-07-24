@@ -28,8 +28,8 @@
  *
  **********************************************************************/
 
-#ifndef _VRW_REPLICA_H_
-#define _VRW_REPLICA_H_
+#ifndef _VRW_WITNESS_H_
+#define _VRW_WITNESS_H_
 
 #include "lib/configuration.h"
 #include "lib/latency.h"
@@ -46,13 +46,13 @@
 namespace specpaxos {
 namespace vrw {
 
-class VRWReplica : public Replica
+class VRWWitness : public Replica
 {
 public:
-    VRWReplica(Configuration config, int myIdx, bool initialize,
+    VRWWitness(Configuration config, int myIdx, bool initialize,
               Transport *transport, int batchSize,
               AppReplica *app);
-    ~VRWReplica();
+    ~VRWWitness();
     
     void ReceiveMessage(const TransportAddress &remote,
                         const string &type, const string &data);
@@ -69,64 +69,35 @@ private:
                         proto::PrepareMessage> > pendingPrepares;
     proto::PrepareMessage lastPrepare;
     int batchSize;
-    opnum_t lastBatchEnd;
-    bool batchComplete;
 
 	opnum_t cleanUpTo;
 	std::vector<opnum_t> lastCommitteds; 
     
     Log log;
-
-	/* Witnesses don't need anything to do with clients or quora */
-    std::map<uint64_t, std::unique_ptr<TransportAddress> > clientAddresses;
-    struct ClientTableEntry
-    {
-        uint64_t lastReqId;
-        bool replied;
-        proto::ReplyMessage reply;
-    };
-    std::map<uint64_t, ClientTableEntry> clientTable;
     
-    QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
-    QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
-    QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
-    QuorumSet<uint64_t, proto::RecoveryResponseMessage> recoveryResponseQuorum;
-
     Timeout *viewChangeTimeout;
-    Timeout *nullCommitTimeout;
     Timeout *stateTransferTimeout;
-    Timeout *resendPrepareTimeout;
-    Timeout *closeBatchTimeout;
     Timeout *recoveryTimeout;
+
+    QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
+    QuorumSet<uint64_t, proto::RecoveryResponseMessage> recoveryResponseQuorum;
 
     Latency_t requestLatency;
     Latency_t executeAndReplyLatency;
 
     uint64_t GenerateNonce() const;
-    bool AmLeader() const;
-	bool AmWitness() const;
+	bool IsWitness(int idx) const;
     void CommitUpTo(opnum_t upto);
     void SendPrepareOKs(opnum_t oldLastOp);
     void SendRecoveryMessages();
     void RequestStateTransfer();
     void EnterView(view_t newview);
     void StartViewChange(view_t newview);
-    void SendNullCommit();
-    void UpdateClientTable(const Request &req);
-    void ResendPrepare();
-    void CloseBatch();
 	opnum_t GetLowestReplicaCommit();
 	void CleanLog();
     
-    void HandleRequest(const TransportAddress &remote,
-                       const proto::RequestMessage &msg);
-    void HandleUnloggedRequest(const TransportAddress &remote,
-                               const proto::UnloggedRequestMessage &msg);
-    
     void HandlePrepare(const TransportAddress &remote,
                        const proto::PrepareMessage &msg);
-    void HandlePrepareOK(const TransportAddress &remote,
-                         const proto::PrepareOKMessage &msg);
     void HandleCommit(const TransportAddress &remote,
                       const proto::CommitMessage &msg);
     void HandleRequestStateTransfer(const TransportAddress &remote,
@@ -135,8 +106,6 @@ private:
                              const proto::StateTransferMessage &msg);
     void HandleStartViewChange(const TransportAddress &remote,
                                const proto::StartViewChangeMessage &msg);
-    void HandleDoViewChange(const TransportAddress &remote,
-                            const proto::DoViewChangeMessage &msg);
     void HandleStartView(const TransportAddress &remote,
                          const proto::StartViewMessage &msg);
     void HandleRecovery(const TransportAddress &remote,
@@ -148,4 +117,4 @@ private:
 } // namespace specpaxos::vrw
 } // namespace specpaxos
 
-#endif  /* _VRW_REPLICA_H_ */
+#endif  /* _VRW_WITNESS_H_ */

@@ -36,6 +36,7 @@
 #include "unreplicated/replica.h"
 #include "vr/replica.h"
 #include "vrw/replica.h"
+#include "vrw/witness.h"
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -231,11 +232,20 @@ main(int argc, char **argv)
         break;
 
     case PROTO_VRW:
-        replica = new specpaxos::vrw::VRWReplica(config, index,
-                                               !recover,
-                                               &transport,
-                                               batchSize,
-                                               nullApp);
+		if (specpaxos::IsWitness(index)) {
+			replica = new specpaxos::vrw::VRWWitness(config, index,
+												   !recover,
+												   &transport,
+												   batchSize,
+												   nullApp);
+
+		} else {
+			replica = new specpaxos::vrw::VRWReplica(config, index,
+												   !recover,
+												   &transport,
+												   batchSize,
+												   nullApp);
+		}
         break;
 
     case PROTO_FASTPAXOS:

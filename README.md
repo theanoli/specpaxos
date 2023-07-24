@@ -71,10 +71,13 @@ replica <hostname>:<port>
 You can then start a replica with `./bench/replica -c <path to config file> -i <replica number> -m <mode>`, where `mode` is either:
   - `spec` for Speculative Paxos
   - `vr` for Viewstamped Replication
+  - `vrw` for Viewstamped Replication with witnesses
   - `fastpaxos` for Fast Paxos
   - `unreplicated` for no replication (uses only the first replica)
 
-The `vr` mode also accepts a `-b` option to specify the maximum batch
+If the mode is VRW, then odd-numbered replicas will be treated as witnesses. 
+
+The `vr*` modes also accepts a `-b` option to specify the maximum batch
 size.
 
 To run a single client, use `./bench/replica -c <path to config file>
