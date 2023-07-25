@@ -46,6 +46,34 @@
 namespace specpaxos {
 namespace vrw {
 
+class DoViewChangeQuorumSet : public QuorumSet<view_t, proto::DoViewChangeMessage>
+{
+public: 
+	using QuorumSet<view_t, proto::DoViewChangeMessage>::QuorumSet; 
+
+    const std::map<int, proto::DoViewChangeMessage> *
+    AddAndCheckForQuorum(uint64_t vs, int replicaIdx, const proto::DoViewChangeMessage &msg)
+    {
+        std::map<int, proto::DoViewChangeMessage> &vsmessages = messages[vs];
+        if (vsmessages.find(replicaIdx) != vsmessages.end()) {
+            // This is a duplicate message
+
+            // But we'll ignore that, replace the old message from
+            // this replica, and proceed.
+            //
+            // XXX Is this the right thing to do? It is for
+            // speculative replies in SpecPaxos...
+        }
+
+        vsmessages[replicaIdx] = msg;
+		if (msg.entries_size() > 0) {
+			Notice("Opnum: " FMT_OPNUM, messages[replicaIdx].entries(0).opnum());
+		}
+        
+        return CheckForQuorum(vs);
+    }
+};
+
 class VRWReplica : public Replica
 {
 public:
@@ -77,7 +105,6 @@ private:
     
     Log log;
 
-	/* Witnesses don't need anything to do with clients or quora */
     std::map<uint64_t, std::unique_ptr<TransportAddress> > clientAddresses;
     struct ClientTableEntry
     {
@@ -89,7 +116,7 @@ private:
     
     QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
     QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
-    QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
+    DoViewChangeQuorumSet doViewChangeQuorum;
     QuorumSet<uint64_t, proto::RecoveryResponseMessage> recoveryResponseQuorum;
 
     Timeout *viewChangeTimeout;
@@ -104,7 +131,6 @@ private:
 
     uint64_t GenerateNonce() const;
     bool AmLeader() const;
-	bool AmWitness() const;
     void CommitUpTo(opnum_t upto);
     void SendPrepareOKs(opnum_t oldLastOp);
     void SendRecoveryMessages();

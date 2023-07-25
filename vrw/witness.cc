@@ -239,7 +239,7 @@ VRWWitness::EnterView(view_t newview)
 void
 VRWWitness::StartViewChange(view_t newview)
 {
-    RNotice("Starting view change for view " FMT_VIEW, newview);
+    RNotice("Starting view change for view " FMT_VIEW ", lastCommitted " FMT_OPNUM, newview, lastCommitted);
 	ASSERT(!specpaxos::IsWitness(configuration.GetLeaderIndex(newview)));
 
     view = newview;
@@ -276,11 +276,11 @@ VRWWitness::ReceiveMessage(const TransportAddress &remote,
     
     if (type == request.GetTypeName()) {
 		Latency_Start(&requestLatency);
-		RNotice("Ignoring logged request because I am a witness");
+		RDebug("Ignoring logged request because I am a witness");
 		Latency_EndType(&requestLatency, 'i');
     } else if (type == unloggedRequest.GetTypeName()) {
 		Latency_Start(&requestLatency);
-		RNotice("Ignoring unlogged request because I am a witness");
+		RDebug("Ignoring unlogged request because I am a witness");
 		Latency_EndType(&requestLatency, 'i');
         unloggedRequest.ParseFromString(data);
     } else if (type == prepare.GetTypeName()) {
@@ -357,7 +357,7 @@ VRWWitness::HandlePrepare(const TransportAddress &remote,
 		cleanUpTo = msg.cleanupto();
 		CleanLog(); 
 	} else if (msg.cleanupto() < cleanUpTo) {
-		RPanic("cleanUpTo decreased! Got " FMT_OPNUM ", had " FMT_OPNUM, 
+		RWarning("cleanUpTo decreased! Got " FMT_OPNUM ", had " FMT_OPNUM, 
 				msg.cleanupto(), cleanUpTo);
 	}
 

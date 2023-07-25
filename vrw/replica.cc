@@ -154,12 +154,6 @@ VRWReplica::AmLeader() const
     return (configuration.GetLeaderIndex(view) == myIdx);
 }
 
-bool
-VRWReplica::AmWitness() const
-{
-       return (IsWitness(myIdx)); 
-}
-
 void
 VRWReplica::CommitUpTo(opnum_t upto)
 {
@@ -178,32 +172,30 @@ VRWReplica::CommitUpTo(opnum_t upto)
         RDebug("Executing request " FMT_OPNUM, lastCommitted);
         ReplyMessage reply;
 
-		if (!AmWitness()) {
-			Execute(lastCommitted, entry->request, reply);
+		Execute(lastCommitted, entry->request, reply);
 
-			reply.set_view(entry->viewstamp.view);
-			reply.set_opnum(entry->viewstamp.opnum);
-			reply.set_clientreqid(entry->request.clientreqid());
-        
-			// Store reply in the client table
-			ClientTableEntry &cte =
-				clientTable[entry->request.clientid()];
-			if (cte.lastReqId <= entry->request.clientreqid()) {
-				cte.lastReqId = entry->request.clientreqid();
-				cte.replied = true;
-				cte.reply = reply;            
-			} else {
-				// We've subsequently prepared another operation from the
-				// same client. So this request must have been completed
-				// at the client, and there's no need to record the
-				// result.
-			}
-			
-			/* Send reply */
-			auto iter = clientAddresses.find(entry->request.clientid());
-			if (iter != clientAddresses.end()) {
-				transport->SendMessage(this, *iter->second, reply);
-			}
+		reply.set_view(entry->viewstamp.view);
+		reply.set_opnum(entry->viewstamp.opnum);
+		reply.set_clientreqid(entry->request.clientreqid());
+	
+		// Store reply in the client table
+		ClientTableEntry &cte =
+			clientTable[entry->request.clientid()];
+		if (cte.lastReqId <= entry->request.clientreqid()) {
+			cte.lastReqId = entry->request.clientreqid();
+			cte.replied = true;
+			cte.reply = reply;            
+		} else {
+			// We've subsequently prepared another operation from the
+			// same client. So this request must have been completed
+			// at the client, and there's no need to record the
+			// result.
+		}
+		
+		/* Send reply */
+		auto iter = clientAddresses.find(entry->request.clientid());
+		if (iter != clientAddresses.end()) {
+			transport->SendMessage(this, *iter->second, reply);
 		}
 
         /* Mark it as committed */
@@ -316,7 +308,7 @@ VRWReplica::EnterView(view_t newview)
 void
 VRWReplica::StartViewChange(view_t newview)
 {
-    RNotice("Starting view change for view " FMT_VIEW, newview);
+    RNotice("Starting view change for view " FMT_VIEW ", lastCommitted " FMT_OPNUM, newview, lastCommitted);
 	ASSERT(!IsWitness(configuration.GetLeaderIndex(newview)));
 
     view = newview;
@@ -655,7 +647,10 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
 		cleanUpTo = msg.cleanupto();
 		CleanLog(); 
 	} else if (msg.cleanupto() < cleanUpTo) {
-		RPanic("cleanUpTo decreased! Got " FMT_OPNUM ", had " FMT_OPNUM, 
+		// A node can see a lower cleanUpTo if the leader fell behind: when it reconstructs
+		// state, it will use its own cleanUpTo as a "safe" value, and will update it 
+		// later once it hears from all the other replicas. 
+		RWarning("cleanUpTo decreased! Got " FMT_OPNUM ", had " FMT_OPNUM, 
 				msg.cleanupto(), cleanUpTo);
 	}
 
@@ -1002,6 +997,8 @@ VRWReplica::HandleStartViewChange(const TransportAddress &remote,
             
             log.Dump(minCommitted,
                      dvc.mutable_entries());
+			RNotice("%d minCommitted: " FMT_OPNUM ", lastCommitted: " FMT_OPNUM, 
+					msg.replicaidx(), minCommitted, lastCommitted);
 
             if (!(transport->SendMessageToReplica(this, leader, dvc))) {
                 RWarning("Failed to send DoViewChange message to leader of new view");
@@ -1015,7 +1012,7 @@ void
 VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                               const DoViewChangeMessage &msg)
 {
-    RDebug("Received DOVIEWCHANGE " FMT_VIEW " from replica %d, "
+    RNotice("Received DOVIEWCHANGE " FMT_VIEW " from replica %d, "
            "lastnormalview=" FMT_VIEW " op=" FMT_OPNUM " committed=" FMT_OPNUM,
            msg.view(), msg.replicaidx(),
            msg.lastnormalview(), msg.lastop(), msg.lastcommitted());
@@ -1043,6 +1040,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
     auto msgs = doViewChangeQuorum.AddAndCheckForQuorum(msg.view(),
                                                         msg.replicaidx(),
                                                         msg);
+
     if (msgs != NULL) {
         // Find the response with the most up to date log, i.e. the
         // one with the latest viewstamp
@@ -1064,8 +1062,8 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         // Install the new log. We might not need to do this, if our
         // log was the most current one.
         if (latestMsg != NULL) {
-            RDebug("Selected log from replica %d with lastop=" FMT_OPNUM,
-                   latestMsg->replicaidx(), latestMsg->lastop());
+            RNotice("Selected log from replica %d with lastop=" FMT_OPNUM ", entries size %d",
+                   latestMsg->replicaidx(), latestMsg->lastop(), latestMsg->entries_size());
             if (latestMsg->entries_size() == 0) {
                 // There weren't actually any entries in the
                 // log. That should only happen in the corner case
@@ -1112,7 +1110,6 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         EnterView(msg.view());
 
         ASSERT(AmLeader());
-		ASSERT(!AmWitness());
         
         lastOp = latestOp;
         if (latestMsg != NULL) {

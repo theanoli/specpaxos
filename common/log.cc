@@ -157,10 +157,10 @@ Log::RemoveUpTo(opnum_t op)
 		ASSERT(entries.begin()->state == LOG_STATE_COMMITTED);
 		entries.erase(entries.begin());	
 		start++;
-		ASSERT(entries.begin()->viewstamp.opnum == start);
+		ASSERT(entries.empty() || entries.begin()->viewstamp.opnum == start);
 	}
 
-	ASSERT(entries.begin()->viewstamp.opnum == op + 1);
+	ASSERT(entries.empty() || entries.begin()->viewstamp.opnum == op + 1);
 	Notice("New log size: " FMT_OPNUM, entries.size());
 }
 
