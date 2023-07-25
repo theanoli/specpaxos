@@ -1012,7 +1012,7 @@ void
 VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                               const DoViewChangeMessage &msg)
 {
-    RNotice("Received DOVIEWCHANGE " FMT_VIEW " from replica %d, "
+    RDebug("Received DOVIEWCHANGE " FMT_VIEW " from replica %d, "
            "lastnormalview=" FMT_VIEW " op=" FMT_OPNUM " committed=" FMT_OPNUM,
            msg.view(), msg.replicaidx(),
            msg.lastnormalview(), msg.lastop(), msg.lastcommitted());
@@ -1046,7 +1046,8 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         // one with the latest viewstamp
         view_t latestView = log.LastViewstamp().view;
         opnum_t latestOp = log.LastViewstamp().opnum;
-        DoViewChangeMessage *latestMsg = NULL;
+        DoViewChangeMessage latestMsgObj;
+		DoViewChangeMessage *latestMsg = NULL;
 
         for (auto kv : *msgs) {
             DoViewChangeMessage &x = kv.second;
@@ -1055,9 +1056,11 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                   (x.lastop() > latestOp)))) {
                 latestView = x.lastnormalview();
                 latestOp = x.lastop();
-                latestMsg = &x;
+				latestMsgObj = kv.second;
+                latestMsg = &latestMsgObj;
             }
         }
+
 
         // Install the new log. We might not need to do this, if our
         // log was the most current one.
