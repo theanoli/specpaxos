@@ -46,34 +46,6 @@
 namespace specpaxos {
 namespace vrw {
 
-class DoViewChangeQuorumSet : public QuorumSet<view_t, proto::DoViewChangeMessage>
-{
-public: 
-	using QuorumSet<view_t, proto::DoViewChangeMessage>::QuorumSet; 
-
-    const std::map<int, proto::DoViewChangeMessage> *
-    AddAndCheckForQuorum(uint64_t vs, int replicaIdx, const proto::DoViewChangeMessage &msg)
-    {
-        std::map<int, proto::DoViewChangeMessage> &vsmessages = messages[vs];
-        if (vsmessages.find(replicaIdx) != vsmessages.end()) {
-            // This is a duplicate message
-
-            // But we'll ignore that, replace the old message from
-            // this replica, and proceed.
-            //
-            // XXX Is this the right thing to do? It is for
-            // speculative replies in SpecPaxos...
-        }
-
-        vsmessages[replicaIdx] = msg;
-		if (msg.entries_size() > 0) {
-			Notice("Opnum: " FMT_OPNUM, messages[replicaIdx].entries(0).opnum());
-		}
-        
-        return CheckForQuorum(vs);
-    }
-};
-
 class VRWReplica : public Replica
 {
 public:
@@ -116,7 +88,7 @@ private:
     
     QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
     QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
-    DoViewChangeQuorumSet doViewChangeQuorum;
+    QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
     QuorumSet<uint64_t, proto::RecoveryResponseMessage> recoveryResponseQuorum;
 
     Timeout *viewChangeTimeout;

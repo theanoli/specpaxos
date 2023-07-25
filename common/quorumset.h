@@ -108,7 +108,7 @@ public:
     
 public:
     int numRequired;
-protected:
+private:
     std::map<IDTYPE, std::map<int, MSGTYPE> > messages;
 };
 
