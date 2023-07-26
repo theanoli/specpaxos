@@ -994,6 +994,7 @@ VRWReplica::HandleStartViewChange(const TransportAddress &remote,
                     return a.second.lastcommitted() < b.second.lastcommitted();
                 })->second.lastcommitted();
             minCommitted = std::min(minCommitted, lastCommitted);
+			minCommitted = std::min(minCommitted, GetLowestReplicaCommit());
             
             log.Dump(minCommitted,
                      dvc.mutable_entries());
@@ -1095,6 +1096,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         // We need to compute this before we enter the new view
         // because the saved messages will go away.
         auto svcs = startViewChangeQuorum.GetMessages(view);
+			
         opnum_t minCommittedSVC = std::min_element(
             svcs.begin(), svcs.end(),
             [](decltype(*svcs.begin()) a,
@@ -1109,12 +1111,13 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
             })->second.lastcommitted();
         opnum_t minCommitted = std::min(minCommittedSVC, minCommittedDVC);
         minCommitted = std::min(minCommitted, lastCommitted);
+        minCommitted = std::min(minCommitted, GetLowestReplicaCommit());
 
+        lastOp = latestOp;
         EnterView(msg.view());
 
         ASSERT(AmLeader());
         
-        lastOp = latestOp;
         if (latestMsg != NULL) {
             CommitUpTo(latestMsg->lastcommitted());
         }
@@ -1176,6 +1179,10 @@ VRWReplica::HandleStartView(const TransportAddress &remote,
         }
         
         // Install the new log
+		RNotice("Installing new log!");
+		for (auto it : msg.entries()) {
+			RNotice("\tnext entry: " FMT_OPNUM, it.opnum());
+		}
         log.RemoveAfter(msg.lastop()+1);
         log.Install(msg.entries().begin(),
                     msg.entries().end());        
@@ -1270,9 +1277,11 @@ VRWReplica::HandleRecoveryResponse(const TransportAddress &remote,
 opnum_t
 VRWReplica::GetLowestReplicaCommit()
 {
+	/*
 	for (size_t i = 0; i < lastCommitteds.size(); i++) {
 		RNotice("Replica %zu has lastCommitted " FMT_OPNUM, i, lastCommitteds[i]);
 	}
+	*/
 	opnum_t lowest = *std::min_element(lastCommitteds.begin(), lastCommitteds.end()); 
 	return lowest;
 }

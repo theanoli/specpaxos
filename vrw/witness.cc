@@ -609,6 +609,7 @@ VRWWitness::HandleStartViewChange(const TransportAddress &remote,
 				return a.second.lastcommitted() < b.second.lastcommitted();
 			})->second.lastcommitted();
 		minCommitted = std::min(minCommitted, lastCommitted);
+		minCommitted = std::min(minCommitted, GetLowestReplicaCommit()); 
 		
 		log.Dump(minCommitted,
 				 dvc.mutable_entries());
@@ -650,6 +651,11 @@ VRWWitness::HandleStartView(const TransportAddress &remote,
         }
         
         // Install the new log
+		// TODO fix: The last opnum in the log is larger than the opnum of one (or more) of 
+		// the entries we are trying to append on installation. 
+		// msg.lastop() = 4087
+		//
+		// On Append: LastOpnum() = 4087, vs.opnum = 4083
         log.RemoveAfter(msg.lastop()+1);
         log.Install(msg.entries().begin(),
                     msg.entries().end());        
