@@ -781,7 +781,8 @@ TEST_P(VRWTest, StressDropAnyReqs)
         clients[i]->Invoke(RequestOp(lastReq[i]), upcalls[i]);
     }
 	int dropIdx = std::numeric_limits<int>::max();  // Invalid dropIdx means drop nothing
-	auto t = time(NULL);
+	// auto t = time(NULL);
+	unsigned long t = 1691008860;
     srand(t);
 	Notice("Seed: %lu", t); 
     

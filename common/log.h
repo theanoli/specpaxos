@@ -37,6 +37,7 @@
 #include "lib/transport.h"
 #include "lib/viewstamp.h"
 
+#include <deque>
 #include <map>
 #include <google/protobuf/message.h>
 
@@ -110,7 +111,7 @@ public:
 
     
 private:
-    std::vector<LogEntry> entries;
+    std::deque<LogEntry> entries;
     string initialHash;
     opnum_t start;
     bool useHash;
