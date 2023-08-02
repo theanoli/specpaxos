@@ -52,6 +52,10 @@ Log::Log(bool useHash, opnum_t start, string initialHash)
 LogEntry &
 Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
 {
+	// 20230631-160456-5163 17417 * HandleDoViewChange (replica.cc:1069):  [0] Selected log from replica 2 with lastop=8293, entries size 4
+	// 20230631-160456-5164 17417 * Append          (log.cc:55):        About to append entry 8290, last opnum is 8293
+	// 20230631-160456-5164 17417 PANIC Append          (log.cc:59):        Assertion `vs.opnum == LastOpnum()+1' failed
+	Notice("About to append entry " FMT_OPNUM ", last opnum is " FMT_OPNUM, vs.opnum, LastOpnum() + 1);
     if (entries.empty()) {
         ASSERT(vs.opnum == start);
     } else {
@@ -72,14 +76,17 @@ LogEntry *
 Log::Find(opnum_t opnum)
 {
     if (entries.empty()) {
+		Notice("Couldn't find " FMT_OPNUM ", entries is empty", opnum);
         return NULL;
     }
 
     if (opnum < start) {
+		Notice("Couldn't find " FMT_OPNUM ", entries is < start", opnum);
         return NULL;
     }
 
     if (opnum-start > entries.size()-1) {
+		Notice("Couldn't find " FMT_OPNUM ", entries-start is > entries.size() - 1", opnum);
         return NULL;
     }
 
@@ -128,10 +135,11 @@ Log::RemoveAfter(opnum_t op)
 #endif
 
     if (op > LastOpnum()) {
+		Notice("No log entries to remove"); 
         return;
     }
 
-    Debug("Removing log entries after " FMT_OPNUM, op);
+    Notice("Removing log entries after " FMT_OPNUM, op);
 
     ASSERT(op - start < entries.size());
     entries.resize(op-start);
@@ -149,7 +157,7 @@ Log::RemoveUpTo(opnum_t op)
 
 	ASSERT(op >= start);
 
-    Debug("Removing log entries up to " FMT_OPNUM "; start is " FMT_OPNUM, op, start);
+    Notice("Removing log entries up to " FMT_OPNUM "; start is " FMT_OPNUM, op, start);
 	ASSERT(entries.begin()->viewstamp.opnum == start);
 	while (start <= op) {
 		// Shouldn't erase uncommitted entries---everyone should have committed

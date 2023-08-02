@@ -50,14 +50,21 @@ Log::Dump(opnum_t from, T out)
 }
 
 template <class iter> void
-Log::Install(iter start, iter end)
+Log::Install(iter begin, iter end)
 {
     // Find the first divergence in the log
-    iter it = start;
-    for (it = start; it != end; it++) {
+    iter it = begin;
+    for (it = begin; it != end; it++) {
         const LogEntry *oldEntry = Find(it->opnum());
         if (oldEntry == NULL) {
-            break;
+			// This op may have been trimmed from the log. We can check this 
+			// by looking at the value of the first op in the log; it would be 
+			// higher than this op. 
+			if (start > it->opnum()) {
+				continue;
+			} else {
+				break;
+			}
         }
         if (it->view() != oldEntry->viewstamp.view) {
             RemoveAfter(it->opnum());
@@ -80,6 +87,7 @@ Log::Install(iter start, iter end)
         viewstamp_t vs = { it->view(), it->opnum() };
         Append(vs, it->request(), LOG_STATE_PREPARED);
     }
+	Notice("Done installing new log");
 }
 
 #endif  /* _COMMON_LOG_IMPL_H_ */

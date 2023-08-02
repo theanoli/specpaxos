@@ -41,7 +41,7 @@
 #include <algorithm>
 #include <random>
 
-#define RDebug(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
+#define RDebug(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RNotice(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RWarning(fmt, ...) Warning("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RPanic(fmt, ...) Panic("[%d] " fmt, myIdx, ##__VA_ARGS__)
@@ -171,13 +171,15 @@ VRWReplica::CommitUpTo(opnum_t upto)
         /* Execute it */
         RDebug("Executing request " FMT_OPNUM, lastCommitted);
         ReplyMessage reply;
-
 		Execute(lastCommitted, entry->request, reply);
 
 		reply.set_view(entry->viewstamp.view);
 		reply.set_opnum(entry->viewstamp.opnum);
 		reply.set_clientreqid(entry->request.clientreqid());
-	
+
+        /* Mark it as committed */
+        log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
+
 		// Store reply in the client table
 		ClientTableEntry &cte =
 			clientTable[entry->request.clientid()];
@@ -197,9 +199,6 @@ VRWReplica::CommitUpTo(opnum_t upto)
 		if (iter != clientAddresses.end()) {
 			transport->SendMessage(this, *iter->second, reply);
 		}
-
-        /* Mark it as committed */
-        log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
 
         Latency_End(&executeAndReplyLatency);
     }
@@ -1073,6 +1072,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                 // log. That should only happen in the corner case
                 // that everyone already had the entire log, maybe
                 // because it actually is empty.
+				RDebug("Log is empty; continuing with view change"); 
                 ASSERT(lastCommitted == msg.lastcommitted());
                 ASSERT(msg.lastop() == msg.lastcommitted());
             } else {
@@ -1109,6 +1109,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                decltype(*msgs->begin()) b) {
                 return a.second.lastcommitted() < b.second.lastcommitted();
             })->second.lastcommitted();
+
         opnum_t minCommitted = std::min(minCommittedSVC, minCommittedDVC);
         minCommitted = std::min(minCommitted, lastCommitted);
         minCommitted = std::min(minCommitted, GetLowestReplicaCommit());
@@ -1181,7 +1182,7 @@ VRWReplica::HandleStartView(const TransportAddress &remote,
         // Install the new log
 		RNotice("Installing new log!");
 		for (auto it : msg.entries()) {
-			RNotice("\tnext entry: " FMT_OPNUM, it.opnum());
+			RNotice("\tEntries: " FMT_OPNUM, it.opnum());
 		}
         log.RemoveAfter(msg.lastop()+1);
         log.Install(msg.entries().begin(),
@@ -1189,9 +1190,11 @@ VRWReplica::HandleStartView(const TransportAddress &remote,
     }
 
 
+	RNotice("Getting ready to enter new view...");
     EnterView(msg.view());
     opnum_t oldLastOp = lastOp;
     lastOp = msg.lastop();
+	RNotice("Finished entering new view...");
 
     ASSERT(!AmLeader());
 
@@ -1277,11 +1280,9 @@ VRWReplica::HandleRecoveryResponse(const TransportAddress &remote,
 opnum_t
 VRWReplica::GetLowestReplicaCommit()
 {
-	/*
 	for (size_t i = 0; i < lastCommitteds.size(); i++) {
 		RNotice("Replica %zu has lastCommitted " FMT_OPNUM, i, lastCommitteds[i]);
 	}
-	*/
 	opnum_t lowest = *std::min_element(lastCommitteds.begin(), lastCommitteds.end()); 
 	return lowest;
 }

@@ -131,7 +131,7 @@ VRWClient::SendRequest()
 void
 VRWClient::ResendRequest()
 {
-    Warning("Client timeout; resending request");
+    Debug("Client timeout; resending request");
     SendRequest();
 }
 
@@ -160,11 +160,11 @@ VRWClient::HandleReply(const TransportAddress &remote,
                       const proto::ReplyMessage &msg)
 {
     if (pendingRequest == NULL) {
-        Warning("Received reply when no request was pending");
+        Debug("Received reply when no request was pending");
         return;
     }
     if (msg.clientreqid() != pendingRequest->clientReqId) {
-        Warning("Received reply for a different request");
+        Debug("Received reply for a different request");
         return;
     }
 
@@ -184,7 +184,7 @@ VRWClient::HandleUnloggedReply(const TransportAddress &remote,
                               const proto::UnloggedReplyMessage &msg)
 {
     if (pendingUnloggedRequest == NULL) {
-        Warning("Received unloggedReply when no request was pending");
+        Debug("Received unloggedReply when no request was pending");
         return;
     }
     
@@ -205,7 +205,7 @@ VRWClient::UnloggedRequestTimeoutCallback()
     PendingRequest *req = pendingUnloggedRequest;
     pendingUnloggedRequest = NULL;
 
-    Warning("Unlogged request timed out");
+    Debug("Unlogged request timed out");
 
     unloggedRequestTimeout->Stop();
     
