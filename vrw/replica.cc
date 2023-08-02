@@ -169,7 +169,10 @@ VRWReplica::CommitUpTo(opnum_t upto)
         }
 
         /* Execute it */
-        RDebug("Executing request " FMT_OPNUM " from client %lu", lastCommitted, entry->request.clientreqid());
+        RDebug("Executing request " FMT_OPNUM " from client %lu (" FMT_OPNUM ")\n\t\t\tLast request from this client: %lu", 
+				lastCommitted, entry->request.clientid(), 
+				entry->request.clientreqid(),
+				clientTable[entry->request.clientid()].lastReqId);
         ReplyMessage reply;
 		Execute(lastCommitted, entry->request, reply);
 
@@ -183,10 +186,8 @@ VRWReplica::CommitUpTo(opnum_t upto)
 		// Store reply in the client table
 		ClientTableEntry &cte =
 			clientTable[entry->request.clientid()];
-		/* 
-		 * if (cte.lastReqId <= entry->request.clientreqid()) {
-		 */
-		if (true) {
+		
+		if (cte.lastReqId <= entry->request.clientreqid()) {
 			cte.lastReqId = entry->request.clientreqid();
 			cte.replied = true;
 			cte.reply = reply;            
@@ -529,7 +530,8 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
                 Latency_EndType(&requestLatency, 'r');
                 return;
             } else {
-                RNotice("Received duplicate request but no reply available; ignoring");
+                RNotice("Received duplicate request %lu:" FMT_OPNUM " but no reply available; ignoring", 
+						msg.req().clientid(), msg.req().clientreqid());
                 Latency_EndType(&requestLatency, 'd');
                 return;
             }
@@ -1049,11 +1051,13 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         // one with the latest viewstamp
         view_t latestView = log.LastViewstamp().view;
         opnum_t latestOp = log.LastViewstamp().opnum;
+		opnum_t highestCommitted = lastCommitted; 
         DoViewChangeMessage latestMsgObj;
         DoViewChangeMessage *latestMsg = NULL;
 
         for (auto kv : *msgs) {
             DoViewChangeMessage &x = kv.second;
+			highestCommitted = std::max(x.lastcommitted(), highestCommitted); 
             if ((x.lastnormalview() > latestView) ||
                 (((x.lastnormalview() == latestView) &&
                   (x.lastop() > latestOp)))) {
@@ -1122,9 +1126,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
 
         ASSERT(AmLeader());
         
-        if (latestMsg != NULL) {
-            CommitUpTo(latestMsg->lastcommitted());
-        }
+		CommitUpTo(highestCommitted);
 
 		// When a new leader comes up, it will start sending around cleanUpTo messages.
 		// It is SAFE to send around a cleanUpTo of 0, since it will be a no-op on replicas.

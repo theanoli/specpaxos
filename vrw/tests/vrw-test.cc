@@ -769,7 +769,7 @@ TEST_P(VRWTest, StressDropAnyReqs)
     std::vector<int> lastReq;
     std::vector<Client::continuation_t> upcalls;
     for (int i = 0; i < NUM_CLIENTS; i++) {
-        clients.push_back(new VRWClient(*config, transport));
+        clients.push_back(new VRWClient(*config, transport, i));
         lastReq.push_back(0);
         upcalls.push_back([&, i](const string &req, const string &reply) {
                 EXPECT_EQ("reply: "+RequestOp(lastReq[i]), reply);
