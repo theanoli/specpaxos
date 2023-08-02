@@ -169,7 +169,7 @@ VRWReplica::CommitUpTo(opnum_t upto)
         }
 
         /* Execute it */
-        RDebug("Executing request " FMT_OPNUM, lastCommitted);
+        RDebug("Executing request " FMT_OPNUM " from client %lu", lastCommitted, entry->request.clientreqid());
         ReplyMessage reply;
 		Execute(lastCommitted, entry->request, reply);
 
@@ -183,7 +183,10 @@ VRWReplica::CommitUpTo(opnum_t upto)
 		// Store reply in the client table
 		ClientTableEntry &cte =
 			clientTable[entry->request.clientid()];
-		if (cte.lastReqId <= entry->request.clientreqid()) {
+		/* 
+		 * if (cte.lastReqId <= entry->request.clientreqid()) {
+		 */
+		if (true) {
 			cte.lastReqId = entry->request.clientreqid();
 			cte.replied = true;
 			cte.reply = reply;            

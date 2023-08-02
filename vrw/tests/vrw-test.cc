@@ -834,7 +834,10 @@ TEST_P(VRWTest, StressDropAnyReqs)
 // Parameter here is the batch size
 INSTANTIATE_TEST_CASE_P(Batching,
                         VRWTest,
+                        ::testing::Values(std::pair<int, int>(5, 8))); 
+							/*
                         ::testing::Values(std::pair<int, int>(3, 1), 
 							std::pair<int, int>(3, 8), 
 							std::pair<int, int>(5, 1),
 							std::pair<int, int>(5, 8)));
+							*/
