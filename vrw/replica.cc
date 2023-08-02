@@ -41,8 +41,8 @@
 #include <algorithm>
 #include <random>
 
-#define RDebug(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
-#define RNotice(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
+#define RDebug(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
+#define RNotice(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RWarning(fmt, ...) Warning("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RPanic(fmt, ...) Panic("[%d] " fmt, myIdx, ##__VA_ARGS__)
 
@@ -574,7 +574,8 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
         v.view = this->view;
         v.opnum = this->lastOp;
 
-        RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
+        RDebug("Received REQUEST %zu:" FMT_OPNUM", assigning " FMT_VIEWSTAMP, 
+				msg.req().clientid(), msg.req().clientreqid(), VA_VIEWSTAMP(v));
 
         /* Add the request to my log */
         log.Append(v, request, LOG_STATE_PREPARED);
@@ -621,6 +622,17 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
 {
     RDebug("Received PREPARE <" FMT_VIEW "," FMT_OPNUM "-" FMT_OPNUM ">",
            msg.view(), msg.batchstart(), msg.opnum());
+
+	/*
+    if (msg.view() == this->view && this->status == STATUS_VIEW_CHANGE) {
+		if (AmLeader()) {
+			RPanic("Unexpected PREPARE: I'm the leader of this view");
+		}
+        RequestStateTransfer();
+        pendingPrepares.push_back(std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
+        return;
+    }
+	*/
 
     if (this->status != STATUS_NORMAL) {
         RDebug("Ignoring PREPARE due to abnormal status");
@@ -932,7 +944,7 @@ VRWReplica::HandleStateTransfer(const TransportAddress &remote,
     }
     
 
-    if (msg.view() > view) {
+    if (msg.view() > view || (msg.view() == view && status == STATUS_VIEW_CHANGE)) {
         EnterView(msg.view());
     }
 
@@ -1087,6 +1099,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                     RPanic("Received log that didn't include enough entries to install it");
                 }
                 
+				// TODO need to UpdateClientTable here
                 log.RemoveAfter(latestMsg->lastop()+1);
                 log.Install(latestMsg->entries().begin(),
                             latestMsg->entries().end());
@@ -1185,9 +1198,23 @@ VRWReplica::HandleStartView(const TransportAddress &remote,
         }
         
         // Install the new log
+		// TS We want to get rid of anything after the last operation seen by the replica
+		// giving us the log. Then we will reconcile what's left with the log given to us
+		// by that replica, possibly adding new entries and/or replacing existing entries. 
         log.RemoveAfter(msg.lastop()+1);
         log.Install(msg.entries().begin(),
                     msg.entries().end());        
+		
+		// TS here we also need to add each entry to the client table. Otherwise
+		// we can receive entries for ops, then receive a duplicate request for 
+		// one of those ops. We will not be able to retrieve the duplicate request
+		// because we don't have a way to look it up; it is not indexed by client. 
+		// TODO need to UpdateClientTable here
+		/*
+		for (opnum_t i = msg.lastOp() + 1; i <= ) {
+			UpdateClientTable(entry->request);
+		}
+		*/
     }
 
 

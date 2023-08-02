@@ -104,7 +104,7 @@ protected:
         for (int i = 0; i < config->n; i++) {
             apps.push_back(new VRWTestApp());
 			if (IsWitness(i)) {
-				replicas.push_back(new VRWWitness(*config, i, true, transport, batchSize, apps[i])); 
+				replicas.push_back(new VRWReplica(*config, i, true, transport, batchSize, apps[i])); 
 			} else {
 				replicas.push_back(new VRWReplica(*config, i, true, transport, batchSize, apps[i]));
 			}
