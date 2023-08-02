@@ -104,7 +104,7 @@ protected:
         for (int i = 0; i < config->n; i++) {
             apps.push_back(new VRWTestApp());
 			if (IsWitness(i)) {
-				replicas.push_back(new VRWReplica(*config, i, true, transport, batchSize, apps[i])); 
+				replicas.push_back(new VRWWitness(*config, i, true, transport, batchSize, apps[i])); 
 			} else {
 				replicas.push_back(new VRWReplica(*config, i, true, transport, batchSize, apps[i]));
 			}
@@ -333,7 +333,7 @@ TEST_P(VRWTest, FailedReplica)
 				EXPECT_EQ(10, static_cast<VRWReplica *>(replicas[i])->GetLogSize());
 			} else {
 				// Witnesses should have full log
-				// EXPECT_EQ(10, static_cast<VRWWitness *>(replicas[i])->GetLogSize());
+				EXPECT_EQ(10, static_cast<VRWWitness *>(replicas[i])->GetLogSize());
 			}
 		}
     }
@@ -385,7 +385,7 @@ TEST_P(VRWTest, StateTransfer)
 			}
 			EXPECT_EQ(2, static_cast<VRWReplica *>(replicas[i])->GetLogSize());
 		} else {
-			// EXPECT_EQ(2, static_cast<VRWWitness *>(replicas[i])->GetLogSize());
+			EXPECT_EQ(2, static_cast<VRWWitness *>(replicas[i])->GetLogSize());
 		}
     }
 }
@@ -769,7 +769,7 @@ TEST_P(VRWTest, StressDropAnyReqs)
     std::vector<int> lastReq;
     std::vector<Client::continuation_t> upcalls;
     for (int i = 0; i < NUM_CLIENTS; i++) {
-        clients.push_back(new VRWClient(*config, transport, i));
+        clients.push_back(new VRWClient(*config, transport));
         lastReq.push_back(0);
         upcalls.push_back([&, i](const string &req, const string &reply) {
                 EXPECT_EQ("reply: "+RequestOp(lastReq[i]), reply);
@@ -781,8 +781,7 @@ TEST_P(VRWTest, StressDropAnyReqs)
         clients[i]->Invoke(RequestOp(lastReq[i]), upcalls[i]);
     }
 	int dropIdx = std::numeric_limits<int>::max();  // Invalid dropIdx means drop nothing
-	// auto t = time(NULL);
-	size_t t = 1690854763;
+	auto t = time(NULL);
     srand(t);
 	Notice("Seed: %lu", t); 
     
@@ -803,7 +802,7 @@ TEST_P(VRWTest, StressDropAnyReqs)
                          });
     
     // This could take a while; simulate two hours
-    transport->Timer(44400000, [&]() {
+    transport->Timer(7200000, [&]() {
             transport->CancelAllTimers();
         });
 
@@ -834,10 +833,7 @@ TEST_P(VRWTest, StressDropAnyReqs)
 // Parameter here is the batch size
 INSTANTIATE_TEST_CASE_P(Batching,
                         VRWTest,
-                        ::testing::Values(std::pair<int, int>(5, 8))); 
-							/*
                         ::testing::Values(std::pair<int, int>(3, 1), 
 							std::pair<int, int>(3, 8), 
 							std::pair<int, int>(5, 1),
 							std::pair<int, int>(5, 8)));
-							*/

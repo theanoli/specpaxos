@@ -41,8 +41,8 @@
 #include <algorithm>
 #include <random>
 
-#define RDebug(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
-#define RNotice(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
+#define RDebug(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
+#define RNotice(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RWarning(fmt, ...) Warning("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RPanic(fmt, ...) Panic("[%d] " fmt, myIdx, ##__VA_ARGS__)
 
@@ -743,9 +743,6 @@ VRWWitness::HandleRecoveryResponse(const TransportAddress &remote,
 opnum_t
 VRWWitness::GetLowestReplicaCommit()
 {
-	for (size_t i = 0; i < lastCommitteds.size(); i++) {
-		RNotice("Replica %zu has lastCommitted " FMT_OPNUM, i, lastCommitteds[i]);
-	}
 	opnum_t lowest = *std::min_element(lastCommitteds.begin(), lastCommitteds.end()); 
 	return lowest;
 }
@@ -756,7 +753,6 @@ VRWWitness::CleanLog()
 	/* 
 	 * Truncate the log up to the current cleanUpTo value.
 	 */
-	return;
 	RNotice("Cleaning up to " FMT_OPNUM, cleanUpTo);
 	log.RemoveUpTo(cleanUpTo);
 }

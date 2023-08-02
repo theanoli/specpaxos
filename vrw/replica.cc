@@ -41,8 +41,8 @@
 #include <algorithm>
 #include <random>
 
-#define RDebug(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
-#define RNotice(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
+#define RDebug(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
+#define RNotice(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RWarning(fmt, ...) Warning("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RPanic(fmt, ...) Panic("[%d] " fmt, myIdx, ##__VA_ARGS__)
 
@@ -1185,21 +1185,15 @@ VRWReplica::HandleStartView(const TransportAddress &remote,
         }
         
         // Install the new log
-		RNotice("Installing new log!");
-		for (auto it : msg.entries()) {
-			RNotice("\tEntries: " FMT_OPNUM, it.opnum());
-		}
         log.RemoveAfter(msg.lastop()+1);
         log.Install(msg.entries().begin(),
                     msg.entries().end());        
     }
 
 
-	RNotice("Getting ready to enter new view...");
     EnterView(msg.view());
     opnum_t oldLastOp = lastOp;
     lastOp = msg.lastop();
-	RNotice("Finished entering new view...");
 
     ASSERT(!AmLeader());
 
@@ -1285,9 +1279,6 @@ VRWReplica::HandleRecoveryResponse(const TransportAddress &remote,
 opnum_t
 VRWReplica::GetLowestReplicaCommit()
 {
-	for (size_t i = 0; i < lastCommitteds.size(); i++) {
-		RNotice("Replica %zu has lastCommitted " FMT_OPNUM, i, lastCommitteds[i]);
-	}
 	opnum_t lowest = *std::min_element(lastCommitteds.begin(), lastCommitteds.end()); 
 	return lowest;
 }
