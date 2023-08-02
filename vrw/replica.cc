@@ -1050,7 +1050,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         view_t latestView = log.LastViewstamp().view;
         opnum_t latestOp = log.LastViewstamp().opnum;
         DoViewChangeMessage latestMsgObj;
-		DoViewChangeMessage *latestMsg = NULL;
+        DoViewChangeMessage *latestMsg = NULL;
 
         for (auto kv : *msgs) {
             DoViewChangeMessage &x = kv.second;
