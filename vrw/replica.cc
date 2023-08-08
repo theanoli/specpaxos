@@ -41,8 +41,8 @@
 #include <algorithm>
 #include <random>
 
-#define RDebug(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
-#define RNotice(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
+#define RDebug(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
+#define RNotice(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RWarning(fmt, ...) Warning("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RPanic(fmt, ...) Panic("[%d] " fmt, myIdx, ##__VA_ARGS__)
 
@@ -197,6 +197,7 @@ VRWReplica::CommitUpTo(opnum_t upto)
 			// at the client, and there's no need to record the
 			// result.
 		}
+		RDebug("Client table entry's last reqID for client %lu: " FMT_OPNUM, entry->request.clientid(), cte.lastReqId);
 		
 		/* Send reply */
 		auto iter = clientAddresses.find(entry->request.clientid());
@@ -350,10 +351,11 @@ void
 VRWReplica::UpdateClientTable(const Request &req)
 {
     ClientTableEntry &entry = clientTable[req.clientid()];
+	RDebug("Updating client %lu: to " FMT_OPNUM " from " FMT_OPNUM, req.clientid(), req.clientreqid(), entry.lastReqId);
 
-    ASSERT(entry.lastReqId <= req.clientreqid());
+    // ASSERT(entry.lastReqId <= req.clientreqid());
 
-    if (entry.lastReqId == req.clientreqid()) {
+    if (entry.lastReqId >= req.clientreqid()) {
         return;
     }
 
@@ -536,7 +538,10 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
                 return;
             }
         }
-    }
+		RDebug("Last reqID for client %lu: " FMT_OPNUM, msg.req().clientid(), entry.lastReqId);
+    } else {
+		RNotice("New client %lu!", msg.req().clientid());
+	}
 
     // Update the client table
     UpdateClientTable(msg.req());
@@ -941,6 +946,7 @@ VRWReplica::HandleStateTransfer(const TransportAddress &remote,
             viewstamp_t vs = { newEntry.view(), newEntry.opnum() };
             log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
         }
+		UpdateClientTable(newEntry.request());
     }
     
 
@@ -1103,6 +1109,9 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                 log.RemoveAfter(latestMsg->lastop()+1);
                 log.Install(latestMsg->entries().begin(),
                             latestMsg->entries().end());
+				for (auto entry : latestMsg->entries()) {
+					UpdateClientTable(entry.request()); 
+				}
             }
         } else {
             RDebug("My log is most current, lastnormalview=" FMT_VIEW " lastop=" FMT_OPNUM,
@@ -1210,11 +1219,12 @@ VRWReplica::HandleStartView(const TransportAddress &remote,
 		// one of those ops. We will not be able to retrieve the duplicate request
 		// because we don't have a way to look it up; it is not indexed by client. 
 		// TODO need to UpdateClientTable here
-		/*
-		for (opnum_t i = msg.lastOp() + 1; i <= ) {
-			UpdateClientTable(entry->request);
+		// Can we safely skip updating the client table unless the op is greater than 
+		// the current lastReqId? If we already have an entry in our client table for 
+		// that client, then we should keep it; if we erase it, the 
+		for (auto entry : msg.entries()) {
+			UpdateClientTable(entry.request());
 		}
-		*/
     }
 
 
