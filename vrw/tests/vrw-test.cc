@@ -104,7 +104,7 @@ protected:
         for (int i = 0; i < config->n; i++) {
             apps.push_back(new VRWTestApp());
 			if (IsWitness(i)) {
-				replicas.push_back(new VRWReplica(*config, i, true, transport, batchSize, apps[i])); 
+				replicas.push_back(new VRWWitness(*config, i, true, transport, batchSize, apps[i])); 
 			} else {
 				replicas.push_back(new VRWReplica(*config, i, true, transport, batchSize, apps[i]));
 			}
@@ -762,7 +762,6 @@ TEST_P(VRWTest, StressDropAnyReqs)
 {
     const int NUM_CLIENTS = 10;
     const int MAX_REQS = 1000;
-    const int MAX_DELAY = 1;
     const int DROP_PROBABILITY = 3; // 1/x
     
     std::vector<VRWClient *> clients;
@@ -782,7 +781,6 @@ TEST_P(VRWTest, StressDropAnyReqs)
     }
 	int dropIdx = std::numeric_limits<int>::max();  // Invalid dropIdx means drop nothing
 	auto t = time(NULL);
-	// unsigned long t = 1691533350;
     srand(t);
 	Notice("Seed: %lu", t); 
     

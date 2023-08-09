@@ -42,7 +42,7 @@
 #include <random>
 
 #define RDebug(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
-#define RNotice(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
+#define RNotice(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RWarning(fmt, ...) Warning("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RPanic(fmt, ...) Panic("[%d] " fmt, myIdx, ##__VA_ARGS__)
 
@@ -628,7 +628,6 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
     RDebug("Received PREPARE <" FMT_VIEW "," FMT_OPNUM "-" FMT_OPNUM ">",
            msg.view(), msg.batchstart(), msg.opnum());
 
-	/*
     if (msg.view() == this->view && this->status == STATUS_VIEW_CHANGE) {
 		if (AmLeader()) {
 			RPanic("Unexpected PREPARE: I'm the leader of this view");
@@ -637,7 +636,6 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
         pendingPrepares.push_back(std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
         return;
     }
-	*/
 
     if (this->status != STATUS_NORMAL) {
         RDebug("Ignoring PREPARE due to abnormal status");
@@ -1105,7 +1103,6 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                     RPanic("Received log that didn't include enough entries to install it");
                 }
                 
-				// TODO need to UpdateClientTable here
                 log.RemoveAfter(latestMsg->lastop()+1);
                 log.Install(latestMsg->entries().begin(),
                             latestMsg->entries().end());
@@ -1214,14 +1211,6 @@ VRWReplica::HandleStartView(const TransportAddress &remote,
         log.Install(msg.entries().begin(),
                     msg.entries().end());        
 		
-		// TS here we also need to add each entry to the client table. Otherwise
-		// we can receive entries for ops, then receive a duplicate request for 
-		// one of those ops. We will not be able to retrieve the duplicate request
-		// because we don't have a way to look it up; it is not indexed by client. 
-		// TODO need to UpdateClientTable here
-		// Can we safely skip updating the client table unless the op is greater than 
-		// the current lastReqId? If we already have an entry in our client table for 
-		// that client, then we should keep it; if we erase it, the 
 		for (auto entry : msg.entries()) {
 			UpdateClientTable(entry.request());
 		}
