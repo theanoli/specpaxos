@@ -17,6 +17,7 @@
 #include "lib/configuration.h"
 #include "spec/client.h"
 #include "vr/client.h"
+#include "vrw/client.h"
 #include "fastpaxos/client.h"
 #include "nistore/request.pb.h"
 
@@ -35,6 +36,7 @@ using namespace std;
 enum Proto {
     PROTO_UNKNOWN,
     PROTO_VR,
+    PROTO_VRW,
     PROTO_SPEC,
     PROTO_FAST
 };

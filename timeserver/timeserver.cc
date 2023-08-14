@@ -68,7 +68,8 @@ main(int argc, char **argv)
     PROTO_UNKNOWN,
     PROTO_VR,
     PROTO_SPEC,
-    PROTO_FAST
+    PROTO_FAST,
+	PROTO_VRW
   } proto = PROTO_UNKNOWN;
 
   // Parse arguments
@@ -100,6 +101,8 @@ main(int argc, char **argv)
             proto = PROTO_SPEC;
           } else if (strcasecmp(optarg, "fast") == 0) {
             proto = PROTO_FAST;
+          } else if (strcasecmp(optarg, "vrw") == 0) {
+            proto = PROTO_VRW;
           } else {
             proto = PROTO_VR;
           }
@@ -151,6 +154,23 @@ main(int argc, char **argv)
       case PROTO_VR:
           replica = new specpaxos::vr::VRReplica(config, index, true, &transport, 1, &server);
           break;
+
+      case PROTO_VRW:
+		if (specpaxos::IsWitness(index)) {
+			replica = new specpaxos::vrw::VRWWitness(config, index,
+												   true,
+												   &transport,
+												   1,
+												   &server);
+		
+		} else {
+			replica = new specpaxos::vrw::VRWReplica(config, index,
+												   true,
+												   &transport,
+												   1,
+												   &server);
+		}
+		break;
 
       case PROTO_SPEC:
           replica = new specpaxos::spec::SpecReplica(

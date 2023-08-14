@@ -35,7 +35,7 @@ Client::Client(Proto mode, string configPath, int nShards)
         exit(0);
     }
     specpaxos::Configuration tssConfig(tssConfigStream);
-    tss = new specpaxos::vr::VRClient(tssConfig, &transport);
+    tss = new specpaxos::vrw::VRWClient(tssConfig, &transport);
     /*
     switch (mode) {
         case PROTO_VR:
@@ -65,6 +65,10 @@ Client::Client(Proto mode, string configPath, int nShards)
         switch (mode) {
             case PROTO_VR:
                 shard[i] = new specpaxos::vr::VRClient(shardConfig, &transport);
+                break;
+
+            case PROTO_VRW:
+                shard[i] = new specpaxos::vrw::VRWClient(shardConfig, &transport);
                 break;
             case PROTO_SPEC:
                 shard[i] = new specpaxos::spec::SpecClient(shardConfig, &transport);

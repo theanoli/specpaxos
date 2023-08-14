@@ -14,6 +14,8 @@
 #include "lib/udptransport.h"
 #include "spec/replica.h"
 #include "vr/replica.h"
+#include "vrw/replica.h"
+#include "vrw/witness.h"
 #include "fastpaxos/replica.h"
 
 #include <string>

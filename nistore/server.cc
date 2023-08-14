@@ -227,7 +227,8 @@ main(int argc, char **argv)
                 server = nistore::Server(false);
             }
 
-            replica = new specpaxos::vr::VRReplica(config, index, true,
+			// TODO decide if we want to get rid of VR all together
+            replica = new specpaxos::vrw::VRWReplica(config, index, true,
                                                    &transport, 1, &server);
             break;
 
