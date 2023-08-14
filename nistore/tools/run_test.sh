@@ -27,7 +27,7 @@ clients=("localhost")
 
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
-storemode="vr-occ"		# Mode for storage system. 
+storemode="vrw-occ"		# Mode for storage system. 
 
 nshard=1     # number of shards
 nclient=1    # number of clients to run (per machine)
@@ -44,7 +44,6 @@ zalpha=-1    # zipf alpha (-1 to disable zipf and enable uniform)
 echo "Configuration:"
 echo "Shards: $nshard"
 echo "Clients per host: $nclient"
-echo "Threads per client: $nthread"
 echo "Keys: $nkeys"
 echo "Transaction Length: $tlen"
 echo "Write Percentage: $wper"
@@ -70,7 +69,7 @@ for ((i=0; i<$nshard; i++))
 do
   echo "Starting shard$i replicas.."
   $srcdir/nistore/tools/start_replica.sh shard$i $srcdir/nistore/tools/shard$i.config \
-    "$srcdir/nistore/replica -m $storemode -f $srcdir/nistore/tools/keys -k $nkeys -e $err -s $skew" $logdir
+    "$srcdir/nistore/replica -m $storemode" $logdir
 done
 
 
@@ -85,7 +84,7 @@ for host in ${clients[@]}
 do
   ssh $host "$srcdir/nistore/tools/start_client.sh \"$srcdir/nistore/$client \
   -c $srcdir/nistore/tools/shard -N $nshard -f $srcdir/nistore/tools/keys \
-  -d $rtime -l $tlen -w $wper -k $nkeys -m $mode -e $err -s $skew -z $zalpha\" \
+  -d $rtime -l $tlen -w $wper -k $nkeys -m $storemode -e $err -s $skew -z $zalpha\" \
   $count $nclient $logdir"
 
   let count=$count+$nclient

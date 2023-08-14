@@ -134,6 +134,7 @@ main(int argc, char **argv)
         PROTO_VR_LOCKING,
         PROTO_SPEC_LOCKING,
         PROTO_VR_OCC,
+        PROTO_VRW_OCC,
         PROTO_SPEC_OCC,
         PROTO_FAST_OCC,
     } proto = PROTO_UNKNOWN;
@@ -167,6 +168,8 @@ main(int argc, char **argv)
                     proto = PROTO_SPEC_LOCKING;
                 } else if (strcasecmp(optarg, "vr-occ") == 0) {
                     proto = PROTO_VR_OCC;
+                } else if (strcasecmp(optarg, "vrw-occ") == 0) {
+                    proto = PROTO_VRW_OCC;
                 } else if (strcasecmp(optarg, "spec-occ") == 0) {
                     proto = PROTO_SPEC_OCC;
                 } else if (strcasecmp(optarg, "fast-occ") == 0) {
@@ -227,7 +230,12 @@ main(int argc, char **argv)
                 server = nistore::Server(false);
             }
 
-			// TODO decide if we want to get rid of VR all together
+            replica = new specpaxos::vr::VRReplica(config, index, true,
+                                                   &transport, 1, &server);
+            break;
+		case PROTO_VRW_OCC:
+			server = nistore::Server(false);
+
             replica = new specpaxos::vrw::VRWReplica(config, index, true,
                                                    &transport, 1, &server);
             break;

@@ -131,6 +131,8 @@ main(int argc, char **argv)
                 mode = nistore::PROTO_VR;
             } else if (strcasecmp(optarg, "vr-occ") == 0) {
                 mode = nistore::PROTO_VR;
+            } else if (strcasecmp(optarg, "vrw-occ") == 0) {
+                mode = nistore::PROTO_VRW;
             } else if (strcasecmp(optarg, "fast-occ") == 0) {
                 mode = nistore::PROTO_FAST;
             } else {
