@@ -6,7 +6,7 @@ CC = gcc
 CXX = g++
 LD = g++
 
-CFLAGS := -g -Wall -pthread -iquote.obj/gen -Wno-uninitialized -DDebug -DNASSERT -O2
+CFLAGS := -g -Wall -pthread -iquote.obj/gen -Wno-uninitialized -DNASSERT -O2
 CXXFLAGS := -std=c++0x
 LDFLAGS := -levent_pthreads -ldl
 ## Debian package: check
@@ -138,6 +138,7 @@ include spec/Rules.mk
 include bench/Rules.mk
 include nistore/Rules.mk
 include timeserver/Rules.mk
+include kvstore/Rules.mk
 
 ##################################################################
 # General rules

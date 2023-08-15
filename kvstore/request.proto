@@ -1,0 +1,22 @@
+package kvstore;
+
+message Request {
+     enum Operation {
+          GET = 1;
+          PUT = 2;
+     }	
+     
+     required Operation op = 1;
+	 required uint64 txnid = 2;
+     optional string arg0 = 3;
+     optional string arg1 = 4;
+}
+
+message Reply {
+     // 0 = OK
+     // -1 = failed
+     // -2 = retry
+     // -3 = abstain/no reply
+     required int32 status = 1;
+     optional string value = 2;
+}

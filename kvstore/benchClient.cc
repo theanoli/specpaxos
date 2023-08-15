@@ -2,12 +2,12 @@
 // vim: set ts=4 sw=4:
 /***********************************************************************
  *
- * nistore/benchClient.cc:
- *   Benchmarking client for NiStore.
+ * kvstore/benchClient.cc:
+ *   Benchmarking client for KVStore.
  *
  **********************************************************************/
 
-#include "nistore/client.h"
+#include "kvstore/client.h"
 
 using namespace std;
 
@@ -26,24 +26,31 @@ main(int argc, char **argv)
     const char *keysPath = NULL;
     int duration = 10;
     int nShards = 1;
-    int tLen = 10;
     int wPer = 50; // Out of 100
     int skew = 0; // difference between real clock and TrueTime
     int error = 0; // error bars
+	bool populate = false;
 
     vector<string> keys;
     string key, value;
 
-    nistore::Proto mode = nistore::PROTO_UNKNOWN;
+    kvstore::Proto mode = kvstore::PROTO_UNKNOWN;
 
     int opt;
-    while ((opt = getopt(argc, argv, "c:d:N:l:w:k:f:m:e:s:")) != -1) {
+    while ((opt = getopt(argc, argv, "c:d:N:l:w:k:f:m:e:s:p")) != -1) {
         switch (opt) {
         case 'c': // Configuration path
         { 
             configPath = optarg;
             break;
         }
+
+		case 'p': 
+		{
+			fprintf(stdout, "I am populating the kvstore!\n");
+			populate = true;
+			break;
+		}
 
         case 'f': // Generated keys path
         { 
@@ -69,17 +76,6 @@ main(int argc, char **argv)
             if ((*optarg == '\0') || (*strtolPtr != '\0') ||
                 (duration <= 0)) {
                 fprintf(stderr, "option -n requires a numeric arg\n");
-            }
-            break;
-        }
-
-        case 'l': // Length of each transaction (deterministic!)
-        {
-            char *strtolPtr;
-            tLen = strtoul(optarg, &strtolPtr, 10);
-            if ((*optarg == '\0') || (*strtolPtr != '\0') ||
-                (tLen <= 0)) {
-                fprintf(stderr, "option -l requires a numeric arg\n");
             }
             break;
         }
@@ -142,18 +138,14 @@ main(int argc, char **argv)
 
         case 'm': // Mode to run in [spec/vr/...]
         {
-            if (strcasecmp(optarg, "spec-l") == 0) {
-                mode = nistore::PROTO_SPEC;
-            } else if (strcasecmp(optarg, "spec-occ") == 0) {
-                mode = nistore::PROTO_SPEC;
-            } else if (strcasecmp(optarg, "vr-l") == 0) {
-                mode = nistore::PROTO_VR;
-            } else if (strcasecmp(optarg, "vr-occ") == 0) {
-                mode = nistore::PROTO_VR;
-            } else if (strcasecmp(optarg, "vrw-occ") == 0) {
-                mode = nistore::PROTO_VRW;
-            } else if (strcasecmp(optarg, "fast-occ") == 0) {
-                mode = nistore::PROTO_FAST;
+            if (strcasecmp(optarg, "spec") == 0) {
+                mode = kvstore::PROTO_SPEC;
+            } else if (strcasecmp(optarg, "vr") == 0) {
+                mode = kvstore::PROTO_VR;
+            } else if (strcasecmp(optarg, "vrw") == 0) {
+                mode = kvstore::PROTO_VRW;
+            } else if (strcasecmp(optarg, "fast") == 0) {
+                mode = kvstore::PROTO_FAST;
             } else {
                 fprintf(stderr, "unknown mode '%s'\n", optarg);
             }
@@ -165,14 +157,17 @@ main(int argc, char **argv)
         }
     }
 
-    if (mode == nistore::PROTO_UNKNOWN) {
+    if (mode == kvstore::PROTO_UNKNOWN) {
         fprintf(stderr, "option -m is required\n");
         exit(0);
     }
 
-    nistore::Client client(mode, configPath, nShards);
+    kvstore::Client client(mode, configPath, nShards);
 
     // Read in the keys from a file and populate the key-value store.
+	// TS the key-value store is never actually populated here. Any GETs of keys
+	// not previously PUT are going to fail. But we probably shouldn't PUT all the
+	// keys here, because there may be many clients starting up. 
     ifstream in;
     in.open(keysPath);
     if (!in) {
@@ -182,85 +177,70 @@ main(int argc, char **argv)
     for (int i = 0; i < nKeys; i++) {
         getline(in, key);
         keys.push_back(key);
+		if (populate) {
+			client.Put(key, key);
+		}
     }
+	fprintf(stdout, "Done populating the kvstore...\n");
     in.close();
 
     
-    struct timeval t0, t1, t2, t3, t4;
+    struct timeval t0, t1, t2, t3;
 
-    int nTransactions = 0; // Number of transactions attempted.
-    int tCount = 0; // Number of transaction succeeded.
+    int nOps = 0; // Number of operations attempted.
     double tLatency = 0.0; // Total latency across all transactions.
     int getCount = 0;
     double getLatency = 0.0;
     int putCount = 0;
     double putLatency = 0.0;
-    int beginCount = 0;
-    double beginLatency = 0.0;
-    int commitCount = 0;
-    double commitLatency = 0.0;
+	bool status;
 
     gettimeofday(&t0, NULL);
     srand(t0.tv_sec + t0.tv_usec);
 
     while (1) {
         gettimeofday(&t1, NULL);
-        client.Begin();
-        gettimeofday(&t4, NULL);
-        
-        beginCount++;
-        beginLatency += ((t4.tv_sec - t1.tv_sec)*1000000 + (t4.tv_usec - t1.tv_usec));
 
-        for (int j = 0; j < tLen; j++) {
-            // Uniform selection of keys.
-            key = keys[rand_key()];
+		key = keys[rand_key()];
 
-            if (rand() % 100 < wPer) {
-                gettimeofday(&t3, NULL);
-                client.Put(key, key);
-                gettimeofday(&t4, NULL);
-                
-                putCount++;
-                putLatency += ((t4.tv_sec - t3.tv_sec)*1000000 + (t4.tv_usec - t3.tv_usec));
-            } else {
-                gettimeofday(&t3, NULL);
-                client.Get(key, value);
-                gettimeofday(&t4, NULL);
+		if (rand() % 100 < wPer) {
+			gettimeofday(&t2, NULL);
+			client.Put(key, key);
+			gettimeofday(&t3, NULL);
+			
+			putCount++;
+			putLatency += ((t3.tv_sec - t2.tv_sec)*1000000 + (t3.tv_usec - t2.tv_usec));
+			status = true;
+		} else {
+			gettimeofday(&t2, NULL);
+			status = client.Get(key, value);
+			gettimeofday(&t3, NULL);
 
-                getCount++;
-                getLatency += ((t4.tv_sec - t3.tv_sec)*1000000 + (t4.tv_usec - t3.tv_usec));
-            }
-        }
+			getCount++;
+			getLatency += ((t3.tv_sec - t2.tv_sec)*1000000 + (t3.tv_usec - t2.tv_usec));
+		}
 
-        gettimeofday(&t3, NULL);
-        bool status = client.Commit();
-        gettimeofday(&t2, NULL);
+        long latency = (t3.tv_sec - t1.tv_sec)*1000000 + (t3.tv_usec - t1.tv_usec);
 
-        commitCount++;
-        commitLatency += ((t2.tv_sec - t3.tv_sec)*1000000 + (t2.tv_usec - t3.tv_usec));
+		// Keys will always exist?!
+		ASSERT(status);
+        fprintf(stderr, "%d %ld.%06ld %ld.%06ld %ld %d\n", nOps+1, 
+				t1.tv_sec, (long)t1.tv_usec, 
+				t2.tv_sec, (long)t2.tv_usec, 
+				latency, 1);
 
-        long latency = (t2.tv_sec - t1.tv_sec)*1000000 + (t2.tv_usec - t1.tv_usec);
-
-        fprintf(stderr, "%d %ld.%06ld %ld.%06ld %ld %d\n", nTransactions+1, t1.tv_sec,
-                (long)t1.tv_usec, t2.tv_sec, (long)t2.tv_usec, latency, status?1:0);
-
-        if (status) {
-            tCount++;
-            tLatency += latency;
-        }
-        nTransactions++;
+		tLatency += latency;
+        nOps++;
 
         gettimeofday(&t1, NULL);
         if ( ((t1.tv_sec-t0.tv_sec)*1000000 + (t1.tv_usec-t0.tv_usec)) > duration*1000000) 
             break;
     }
 
-    printf("# Commit_Ratio: %lf\n", (double)tCount/nTransactions);
-    printf("# Overall_Latency: %lf\n", tLatency/tCount);
-    printf("# Begin: %d, %lf\n", beginCount, beginLatency/beginCount);
+    printf("# Overall_Latency: %lf\n", tLatency/nOps);
+    printf("# Nops: %d\n", nOps);
     printf("# Get: %d, %lf\n", getCount, getLatency/getCount);
     printf("# Put: %d, %lf\n", putCount, putLatency/putCount);
-    printf("# Commit: %d, %lf\n", commitCount, commitLatency/commitCount);
     
     exit(0);
     return 0;
