@@ -29,16 +29,16 @@ client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
 storemode="vrw-occ"		# Mode for storage system. 
 
-nshard=1     # number of shards
-nclient=1    # number of clients to run (per machine)
-nkeys=10000 # number of keys to use
+nshard=5     # number of shards
+nclient=5    # number of clients to run (per machine)
+nkeys=1000 # number of keys to use
 rtime=10     # duration to run
 
-tlen=2       # transaction length
-wper=0       # writes percentage
+tlen=2		 # transaction length
+wper=50       # writes percentage
 err=0        # error
 skew=0       # skew
-zalpha=-1    # zipf alpha (-1 to disable zipf and enable uniform)
+zalpha=0.9    # zipf alpha (-1 to disable zipf and enable uniform)
 
 # Print out configuration being used.
 echo "Configuration:"

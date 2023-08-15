@@ -11,6 +11,14 @@
 
 using namespace std;
 
+int rand_key();
+
+int nKeys = 100;
+double alpha = -1;
+double *zipf; 
+
+bool ready = false;
+
 int
 main(int argc, char **argv)
 {
@@ -25,7 +33,6 @@ main(int argc, char **argv)
 
     vector<string> keys;
     string key, value;
-    int nKeys = 100;
 
     nistore::Proto mode = nistore::PROTO_UNKNOWN;
 
@@ -121,6 +128,18 @@ main(int argc, char **argv)
             break;
         }
 
+        case 'z': // Zipf coefficient for key selection.
+        {
+            char *strtolPtr;
+            alpha = strtod(optarg, &strtolPtr);
+            if ((*optarg == '\0') || (*strtolPtr != '\0'))
+            {
+                fprintf(stderr,
+                        "option -z requires a numeric arg\n");
+            }
+            break;
+        }
+
         case 'm': // Mode to run in [spec/vr/...]
         {
             if (strcasecmp(optarg, "spec-l") == 0) {
@@ -170,7 +189,7 @@ main(int argc, char **argv)
     struct timeval t0, t1, t2, t3, t4;
 
     int nTransactions = 0; // Number of transactions attempted.
-    int tCount = 0; // Number of transaction suceeded.
+    int tCount = 0; // Number of transaction succeeded.
     double tLatency = 0.0; // Total latency across all transactions.
     int getCount = 0;
     double getLatency = 0.0;
@@ -194,17 +213,10 @@ main(int argc, char **argv)
 
         for (int j = 0; j < tLen; j++) {
             // Uniform selection of keys.
-            key = keys[rand() % nKeys];
-
-            // Zipf-like selection of keys.
-            /*
-            int r = log(RAND_MAX/(1.0+rand()))*nKeys/100;
-            if (r > nKeys) r = r % nKeys;
-            key = keys[r];
-            */
+            key = keys[rand_key()];
 
             if (rand() % 100 < wPer) {
-                //value = random_string();
+                value = random_string();
                 gettimeofday(&t3, NULL);
                 client.Put(key, key);
                 gettimeofday(&t4, NULL);
@@ -253,4 +265,50 @@ main(int argc, char **argv)
     
     exit(0);
     return 0;
+}
+
+
+int rand_key()
+{
+    if (alpha < 0) {
+        // Uniform selection of keys.
+        return (rand() % nKeys);
+    } else {
+        // Zipf-like selection of keys.
+        if (!ready) {
+            zipf = new double[nKeys];
+
+            double c = 0.0;
+            for (int i = 1; i <= nKeys; i++) {
+                c = c + (1.0 / pow((double) i, alpha));
+            }
+            c = 1.0 / c;
+
+            double sum = 0.0;
+            for (int i = 1; i <= nKeys; i++) {
+                sum += (c / pow((double) i, alpha));
+                zipf[i-1] = sum;
+            }
+            ready = true;
+        }
+
+        double random = 0.0;
+        while (random == 0.0 || random == 1.0) {
+            random = (1.0 + rand())/RAND_MAX;
+        }
+
+        // binary search to find key;
+        int l = 0, r = nKeys, mid;
+        while (l < r) {
+            mid = (l + r) / 2;
+            if (random > zipf[mid]) {
+                l = mid + 1;
+            } else if (random < zipf[mid]) {
+                r = mid - 1;
+            } else {
+                break;
+            }
+        }
+        return mid;
+    } 
 }

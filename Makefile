@@ -6,7 +6,7 @@ CC = gcc
 CXX = g++
 LD = g++
 
-CFLAGS := -g -Wall -pthread -iquote.obj/gen -Wno-uninitialized
+CFLAGS := -g -Wall -pthread -iquote.obj/gen -Wno-uninitialized -DDebug -DNASSERT -O2
 CXXFLAGS := -std=c++0x
 LDFLAGS := -levent_pthreads -ldl
 ## Debian package: check
