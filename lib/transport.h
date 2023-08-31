@@ -75,6 +75,7 @@ public:
     virtual bool SendMessage(TransportReceiver *src, const TransportAddress &dst,
                              const Message &m) = 0;
     virtual bool SendMessageToReplica(TransportReceiver *src, int replicaIdx, const Message &m) = 0;
+    virtual bool SendMessageToReplicas(TransportReceiver *src, const Message &m) = 0;
     virtual bool SendMessageToAll(TransportReceiver *src, const Message &m) = 0;
     virtual int Timer(uint64_t ms, timer_callback_t cb) = 0;
     virtual bool CancelTimer(int id) = 0;
