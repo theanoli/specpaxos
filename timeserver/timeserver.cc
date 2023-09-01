@@ -156,7 +156,7 @@ main(int argc, char **argv)
           break;
 
       case PROTO_VRW:
-		if (specpaxos::IsWitness(index)) {
+		if (config.IsWitness(index)) {
 			replica = new specpaxos::vrw::VRWWitness(config, index,
 												   true,
 												   &transport,

@@ -103,7 +103,7 @@ public:
                     continue;
                 }
                 // check if we're sending to a witness
-                else if (kv2.first % 2 == 1) {
+                else if (cfg->IsWitness(kv2.first)) {
                     continue;
                 }
                 if (!SendMessageInternal(src, kv2.second, m, false)) {

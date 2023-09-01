@@ -78,7 +78,7 @@ VRWWitness::VRWWitness(Configuration config, int myIdx,
     this->viewChangeTimeout = new Timeout(transport, 5000, [this,myIdx]() {
             RWarning("Have not heard from leader; starting view change");
 			view_t step = 1;
-			while (specpaxos::IsWitness(configuration.GetLeaderIndex(view + step))) {
+			while (configuration.IsWitness(configuration.GetLeaderIndex(view + step))) {
 				step++; 
 			}
             StartViewChange(view + step);
@@ -240,7 +240,7 @@ void
 VRWWitness::StartViewChange(view_t newview)
 {
     RNotice("Starting view change for view " FMT_VIEW ", lastCommitted " FMT_OPNUM, newview, lastCommitted);
-	ASSERT(!specpaxos::IsWitness(configuration.GetLeaderIndex(newview)));
+	ASSERT(!configuration.IsWitness(configuration.GetLeaderIndex(newview)));
 
     view = newview;
     status = STATUS_VIEW_CHANGE;

@@ -68,6 +68,10 @@ public:
     inline int GetLeaderIndex(view_t view) const {
         return (view % n);
     };
+    // Odd nodes are witnesses
+    inline bool IsWitness(int idx) const {
+	    return (idx % 2 == 1); 
+    };  // For VRW
     int QuorumSize() const;
     int FastQuorumSize() const;
     bool operator==(const Configuration &other) const;

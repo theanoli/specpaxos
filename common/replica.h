@@ -93,7 +93,6 @@ protected:
     ReplicaStatus status;
 };
 
-bool IsWitness(int idx);  // For VRW
     
 #include "replica-inl.h"
 
