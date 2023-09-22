@@ -44,7 +44,9 @@ Log::Dump(opnum_t from, T out)
         elem->set_view(entry->viewstamp.view);
         elem->set_opnum(entry->viewstamp.opnum);
         elem->set_state(entry->state);
-        elem->set_hash(entry->hash);
+        if (useHash) {
+            elem->set_hash(entry->hash);
+        }
         *(elem->mutable_request()) = entry->request;        
     }
 }

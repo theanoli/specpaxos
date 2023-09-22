@@ -50,9 +50,9 @@ message StateTransferMessage {
     message LogEntry {
         required uint64 view = 1;
         required uint64 opnum = 2;
-        required specpaxos.Request request = 3;
-        optional uint32 state = 4;
-        optional bytes hash = 5;
+        optional uint32 state = 3;
+        optional bytes hash = 4;
+        required specpaxos.Request request = 5;
     }
     required uint64 view = 1;
     required uint64 opnum = 2;
@@ -69,25 +69,25 @@ message DoViewChangeMessage {
     message LogEntry {
         required uint64 view = 1;
         required uint64 opnum = 2;
-        required specpaxos.Request request = 3;
-        optional uint32 state = 4;
-        optional bytes hash = 5;
+        optional uint32 state = 3;
+        optional bytes hash = 4;
+        required specpaxos.Request request = 5;
     }
     required uint64 view = 1;
     required uint64 lastNormalView = 2;
     required uint64 lastOp = 3;
     required uint64 lastCommitted = 4;
-    repeated LogEntry entries = 5;
-    required uint32 replicaIdx = 6;    
+    required uint32 replicaIdx = 5;    
+    repeated LogEntry entries = 6;
 }
 
 message StartViewMessage {
     message LogEntry {
         required uint64 view = 1;
         required uint64 opnum = 2;
-        required specpaxos.Request request = 3;
-        optional uint32 state = 4;
-        optional bytes hash = 5;
+        optional uint32 state = 3;
+        optional bytes hash = 4;
+        required specpaxos.Request request = 5;
     }
     required uint64 view = 1;
     required uint64 lastOp = 2;
@@ -104,14 +104,14 @@ message RecoveryResponseMessage {
     message LogEntry {
         required uint64 view = 1;
         required uint64 opnum = 2;
-        required specpaxos.Request request = 3;
-        optional uint32 state = 4;
-        optional bytes hash = 5;
+        optional uint32 state = 3;
+        optional bytes hash = 4;
+        required specpaxos.Request request = 5;
     }
     required uint64 view = 1;
     required uint64 nonce = 2;
-    repeated LogEntry entries = 3;
-    optional uint64 lastOp = 4;
-    optional uint64 lastCommitted = 5;
-    required uint32 replicaIdx = 6;
+    optional uint64 lastOp = 3;
+    optional uint64 lastCommitted = 4;
+    required uint32 replicaIdx = 5;
+    repeated LogEntry entries = 6;
 }

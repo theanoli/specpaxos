@@ -96,7 +96,7 @@ VRWWitness::VRWWitness(Configuration config, int myIdx,
     _Latency_Init(&executeAndReplyLatency, "executeAndReply");
 
     if (initialize) {
-		viewChangeTimeout->Start();
+		//viewChangeTimeout->Start();
     } else {
         this->status = STATUS_RECOVERING;
         this->recoveryNonce = GenerateNonce();
@@ -230,7 +230,7 @@ VRWWitness::EnterView(view_t newview)
 
     recoveryTimeout->Stop();
 
-	viewChangeTimeout->Start();
+	//viewChangeTimeout->Start();
 
     startViewChangeQuorum.Clear();
     recoveryResponseQuorum.Clear();
@@ -245,7 +245,7 @@ VRWWitness::StartViewChange(view_t newview)
     view = newview;
     status = STATUS_VIEW_CHANGE;
 
-    viewChangeTimeout->Reset();
+    //viewChangeTimeout->Reset();
 
     StartViewChangeMessage m;
     m.set_view(newview);
@@ -364,7 +364,7 @@ VRWWitness::HandlePrepare(const TransportAddress &remote,
     ASSERT(msg.batchstart() <= msg.opnum());
     ASSERT_EQ(msg.opnum()-msg.batchstart()+1, (unsigned)msg.request_size());
               
-    viewChangeTimeout->Reset();
+    //viewChangeTimeout->Reset();
     
     if (msg.opnum() <= this->lastOp) {
         RDebug("Ignoring PREPARE; already prepared that operation");
@@ -437,7 +437,7 @@ VRWWitness::HandleCommit(const TransportAddress &remote,
         return;
     }
 
-    viewChangeTimeout->Reset();
+    //viewChangeTimeout->Reset();
     
     if (msg.opnum() <= this->lastCommitted) {
         RDebug("Ignoring COMMIT; already committed that operation");
