@@ -1,3 +1,10 @@
+# Beehive modifications
+Original README preserved below. To build the simple VR application with the
+Beehive serialization, run make CXXFLAGS="-DUSE_BEEHIVE=1"
+
+This replaces the protobuf serialization with something that is more easily
+parsed by FPGA, but also doesn't support the full complexity of protobufs.
+
 # Speculative Paxos
 
 This is an implementation of the Speculative Paxos protocol, as
