@@ -16,8 +16,8 @@ trap '{
 }' INT
 
 # Paths to source code and logfiles.
-srcdir="/home/theano/specpaxos"
-logdir="/home/theano/specpaxos/logs"
+srcdir="$HOME/specpaxos"
+logdir="$HOME/specpaxos/logs"
 
 # Machines on which replicas are running.
 replicas=("localhost")
@@ -27,7 +27,6 @@ clients=("localhost")
 
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
-storemode="vrw-occ"		# Mode for storage system. 
 
 nshard=2     # number of shards
 nclient=2    # number of clients to run (per machine)
@@ -36,7 +35,6 @@ rtime=10     # duration to run
 
 wper=50       # writes percentage
 err=0        # error
-skew=0       # skew
 zalpha=0.9    # zipf alpha (-1 to disable zipf and enable uniform)
 
 # Print out configuration being used.
@@ -46,9 +44,7 @@ echo "Clients per host: $nclient"
 echo "Keys: $nkeys"
 echo "Write Percentage: $wper"
 echo "Error: $err"
-echo "Skew: $skew"
 echo "Zipf alpha: $zalpha"
-echo "Skew: $skew"
 echo "Client: $client"
 echo "Mode: $mode"
 
