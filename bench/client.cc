@@ -79,10 +79,11 @@ int main(int argc, char **argv)
     } proto = PROTO_UNKNOWN;
     string latencyFile;
     string latencyRawFile;
+    string latencyTimeseries;
 
     // Parse arguments
     int opt;
-    while ((opt = getopt(argc, argv, "c:d:q:l:m:n:t:w:")) != -1) {
+    while ((opt = getopt(argc, argv, "c:d:f:q:l:m:n:t:w:")) != -1) {
         switch (opt) {
         case 'c':
             configPath = optarg;
@@ -100,7 +101,10 @@ int main(int argc, char **argv)
             }
             break;
         }
-
+        case 'f': {
+            latencyTimeseries = string(optarg);
+            break;
+        }
         case 'q':
         {
             char *strtolPtr;
@@ -255,6 +259,45 @@ int main(int argc, char **argv)
                 }
             }
             Notice("All clients done.");
+            for (uint64_t i = 0; i < benchClients.size(); i++) {
+                if (latencyTimeseries.size() > 0) {
+                    char client_filename[256];
+                    sprintf(client_filename, "%s_%lu", latencyTimeseries.c_str(),
+                            i);
+                    Notice("Dumping time series data to %s", client_filename);
+                    std::ofstream timeseries_file(client_filename,
+                            std::ios::out);
+                    for (uint64_t latency : benchClients[i]->latencies) {
+                        char latency_buf[1024];
+                        LatencyFmtNS(latency, latency_buf);
+                        timeseries_file << latency_buf << "\n";
+                    }
+                    timeseries_file.close();
+                }
+                specpaxos::BenchmarkClient *curr_client = benchClients[i];
+           
+                char buf[1024];
+                std::sort(curr_client->latencies.begin(), curr_client->latencies.end());
+
+                uint64_t ns = curr_client->latencies[curr_client->latencies.size()/2];
+                LatencyFmtNS(ns, buf);
+                Notice("Median latency is %" PRIu64 " ns (%s)", ns, buf);
+
+                ns = curr_client->latencies[curr_client->latencies.size()*90/100];
+                LatencyFmtNS(ns, buf);
+                Notice("90th percentile latency is %" PRIu64 " ns (%s)", ns, buf);
+                
+                ns = curr_client->latencies[curr_client->latencies.size()*95/100];
+                LatencyFmtNS(ns, buf);
+                Notice("95th percentile latency is %" PRIu64 " ns (%s)", ns, buf);
+
+                ns = curr_client->latencies[curr_client->latencies.size()*99/100];
+                LatencyFmtNS(ns, buf);
+                Notice("99th percentile latency is %" PRIu64 " ns (%s)", ns, buf);
+
+            }
+
+
 
             Latency_t sum;
             _Latency_Init(&sum, "total");
@@ -264,18 +307,20 @@ int main(int argc, char **argv)
             Latency_Dump(&sum);
             if (latencyFile.size() > 0) {
                 Latency_FlushTo(latencyFile.c_str());
-            }
+                latencyRawFile = latencyFile+".raw";
 
-            latencyRawFile = latencyFile+".raw";
-            std::ofstream rawFile(latencyRawFile.c_str(),
-                                  std::ios::out | std::ios::binary);
-            for (auto x : benchClients) {
-                rawFile.write((char *)&x->latencies[0],
-                              (x->latencies.size()*sizeof(x->latencies[0])));
-                if (!rawFile) {
-                    Warning("Failed to write raw latency output");
+                Notice("Dumping raw data to %s", latencyRawFile.c_str());
+                std::ofstream rawFile(latencyRawFile.c_str(),
+                                      std::ios::out | std::ios::binary);
+                for (auto x : benchClients) {
+                    rawFile.write((char *)&x->latencies[0],
+                                  (x->latencies.size()*sizeof(x->latencies[0])));
+                    if (!rawFile) {
+                        Warning("Failed to write raw latency output");
+                    }
                 }
             }
+
             exit(0);
         });
     checkTimeout.Start();

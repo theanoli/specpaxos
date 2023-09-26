@@ -89,23 +89,6 @@ BenchmarkClient::CooldownDone()
     char buf[1024];
     cooldownDone = true;
     Notice("Finished cooldown period.");
-    std::sort(latencies.begin(), latencies.end());
-
-    uint64_t ns = latencies[latencies.size()/2];
-    LatencyFmtNS(ns, buf);
-    Notice("Median latency is %" PRIu64 " ns (%s)", ns, buf);
-
-    ns = latencies[latencies.size()*90/100];
-    LatencyFmtNS(ns, buf);
-    Notice("90th percentile latency is %" PRIu64 " ns (%s)", ns, buf);
-    
-    ns = latencies[latencies.size()*95/100];
-    LatencyFmtNS(ns, buf);
-    Notice("95th percentile latency is %" PRIu64 " ns (%s)", ns, buf);
-
-    ns = latencies[latencies.size()*99/100];
-    LatencyFmtNS(ns, buf);
-    Notice("99th percentile latency is %" PRIu64 " ns (%s)", ns, buf);
 }
 
 void
