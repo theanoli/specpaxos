@@ -26,8 +26,7 @@ main(int argc, char **argv)
     const char *keysPath = NULL;
     int duration = 10;
     int nShards = 1;
-    int wPer = 50; // Out of 100
-    int skew = 0; // difference between real clock and TrueTime
+    int writePercentage = 50; // Out of 100
     int error = 0; // error bars
 	bool populate = false;
 
@@ -83,9 +82,9 @@ main(int argc, char **argv)
         case 'w': // Percentage of writes (out of 100)
         {
             char *strtolPtr;
-            wPer = strtoul(optarg, &strtolPtr, 10);
+            writePercentage = strtoul(optarg, &strtolPtr, 10);
             if ((*optarg == '\0') || (*strtolPtr != '\0') ||
-                (wPer < 0 || wPer > 100)) {
+                (writePercentage < 0 || writePercentage > 100)) {
                 fprintf(stderr, "option -w requires a arg b/w 0-100\n");
             }
             break;
@@ -98,17 +97,6 @@ main(int argc, char **argv)
             if ((*optarg == '\0') || (*strtolPtr != '\0') ||
                 (nKeys <= 0)) {
                 fprintf(stderr, "option -k requires a numeric arg\n");
-            }
-            break;
-        }
-        case 's':
-        {
-            char *strtolPtr;
-            skew = strtoul(optarg, &strtolPtr, 10);
-            if ((*optarg == '\0') || (*strtolPtr != '\0') || (skew < 0))
-            {
-                fprintf(stderr,
-                        "option -s requires a numeric arg\n");
             }
             break;
         }
@@ -203,7 +191,7 @@ main(int argc, char **argv)
 
 		key = keys[rand_key()];
 
-		if (rand() % 100 < wPer) {
+		if (rand() % 100 < writePercentage) {
 			gettimeofday(&t2, NULL);
 			client.Put(key, key);
 			gettimeofday(&t3, NULL);
