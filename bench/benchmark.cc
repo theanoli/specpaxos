@@ -39,6 +39,7 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <string.h>
 
 namespace specpaxos {
     
@@ -47,10 +48,12 @@ DEFINE_LATENCY(op);
 BenchmarkClient::BenchmarkClient(Client &client, Transport &transport,
                                  int numRequests, uint64_t delay,
                                  int warmupSec,
-                                 string latencyFilename)
+                                 uint64_t payload_size,
+                                 string latencyFilename
+                                )
     : client(client), transport(transport),
       numRequests(numRequests), delay(delay),
-      warmupSec(warmupSec), latencyFilename(latencyFilename)
+      warmupSec(warmupSec), latencyFilename(latencyFilename), payload_size(payload_size)
 {
     if (delay != 0) {
         Notice("Delay between requests: %" PRIu64 " ms", delay);        
@@ -94,11 +97,15 @@ BenchmarkClient::CooldownDone()
 void
 BenchmarkClient::SendNext()
 {
-    std::ostringstream msg;
-    msg << "request" << n;
+    char request_buf[this->payload_size];
+    memset(request_buf, (n + 64)%32, this->payload_size);
+
+//    std::ostringstream msg;
+//    msg << "request" << n;
+    string request(request_buf);
 
     Latency_Start(&latency);
-    client.Invoke(msg.str(), std::bind(&BenchmarkClient::OnReply,
+    client.Invoke(request, std::bind(&BenchmarkClient::OnReply,
                                        this,
                                        std::placeholders::_1,
                                        std::placeholders::_2));

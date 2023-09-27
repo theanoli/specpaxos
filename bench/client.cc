@@ -48,7 +48,7 @@
 static void
 Usage(const char *progName)
 {
-        fprintf(stderr, "usage: %s [-n requests] [-t threads] [-w warmup-secs] [-l latency-file] [-q dscp] [-d delay-ms] -c conf-file -m unreplicated|vr|vrw|fastpaxos|spec\n",
+        fprintf(stderr, "usage: %s [-n requests] [-t threads] [] [-w warmup-secs] [-l latency-file] [-q dscp] [-d delay-ms] -c conf-file -m unreplicated|vr|vrw|fastpaxos|spec\n",
                 progName);
         exit(1);
 }
@@ -67,6 +67,7 @@ int main(int argc, char **argv)
     int warmupSec = 0;
     int dscp = 0;
     uint64_t delay = 0;
+    uint64_t payload_size = 64;
     
     enum
     {
@@ -83,7 +84,7 @@ int main(int argc, char **argv)
 
     // Parse arguments
     int opt;
-    while ((opt = getopt(argc, argv, "c:d:f:q:l:m:n:t:w:")) != -1) {
+    while ((opt = getopt(argc, argv, "c:d:f:q:l:m:n:t:w:s:")) != -1) {
         switch (opt) {
         case 'c':
             configPath = optarg;
@@ -153,7 +154,17 @@ int main(int argc, char **argv)
             }
             break;
         }
-
+        case 's': {
+            char *strtolPtr;
+            payload_size = strtoul(optarg, &strtolPtr, 10);
+            if ((*optarg == '\0') || (*strtolPtr != '\0'))
+            {
+                fprintf(stderr,
+                        "option -s requires a numeric arg\n");
+                Usage(argv[0]);
+            }
+            break;
+        }
         case 't':
         {
             char *strtolPtr;
@@ -245,7 +256,7 @@ int main(int argc, char **argv)
         specpaxos::BenchmarkClient *bench =
             new specpaxos::BenchmarkClient(*client, transport,
                                            numRequests, delay,
-                                           warmupSec);
+                                           warmupSec, payload_size);
 
         transport.Timer(0, [=]() { bench->Start(); });
         clients.push_back(client);

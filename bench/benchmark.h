@@ -40,7 +40,9 @@ public:
     BenchmarkClient(Client &client, Transport &transport,
                     int numRequests, uint64_t delay,
                     int warmupSec,
-                    string latencyFilename = "");
+                    uint64_t payload_size,
+                    string latencyFilename = ""
+                   );
     void Start();
     void OnReply(const string &request, const string &reply);
     struct Latency_t latency;
@@ -57,6 +59,7 @@ private:
     Client &client;
     Transport &transport;
     int numRequests;
+    uint64_t payload_size;
     uint64_t delay;
     int n;
     int warmupSec;

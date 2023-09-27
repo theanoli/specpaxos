@@ -25,44 +25,45 @@ controlReplicas() {
             fpga_ip_index_map["${HOST_IP}"]=${REPLICA_INDEX}
         else
             cpu_index_ip_map["${REPLICA_INDEX}"]="${HOST_IP}"
+            echo "${REPLICA_INDEX}"
         fi
 
         REPLICA_INDEX=$((${REPLICA_INDEX}+1))
     done <<< "$(tail -n +2 ${CONFIG_FILE})"
 
-#    startFPGAs ${fpga_ip_index_map}
+    startFPGAs fpga_ip_index_map
 
-    startCPUs ${cpu_index_ip_map}
+    startCPUs cpu_index_ip_map
    
 }
 
 startCPUs() {
-    local cpu_index_ip_map=${1}
+    local -n cpu_index_ip_map_ref=${1}
     echo "starting the cpu nodes"
     # copy the config into place
-    for index in ${!cpu_index_ip_map[@]}; do
-        echo "${index}"
-        local cpu_ip=${cpu_index_ip_map[${index}]}
+    for index in ${!cpu_index_ip_map_ref[@]}; do
+        local cpu_ip=${cpu_index_ip_map_ref[${index}]}
         local rsync_cmd="rsync -ave 'ssh' ${CONFIG_DIR}/${CONFIG_FILE} ${cpu_ip}:${CONFIG_DIR}"
         echo ${rsync_cmd}
         eval ${rsync_cmd}
     done
-    if [[ -n "${cpu_index_ip_map[0]}" ]]; then
-        local cpu_ip=${cpu_index_ip_map[0]}
-        local cpu_cmd="ssh ${cpu_ip} \"${REPO_ROOT}/scripts/run_simple_replica.sh 0 ${CONFIG_FILE}\""
+    if [[ -n "${cpu_index_ip_map_ref[0]}" ]]; then
+        local cpu_ip=${cpu_index_ip_map_ref[0]}
+        local cpu_cmd="ssh ${cpu_ip} \"cd ${REPO_ROOT}/scripts; ${REPO_ROOT}/scripts/run_simple_replica.sh ${CONFIG_FILE} 0\""
         echo "${cpu_cmd} &"
         eval "${cpu_cmd} &"
-
     else
         echo "replica 0 must be a CPU node"
     fi
-    for index in ${!cpu_index_ip_map[@]}; do
+    sleep 3
+    for index in ${!cpu_index_ip_map_ref[@]}; do
+        echo "starting node ${index}"
         if [[ ${index} -eq 0 ]]; then
             continue
         fi
         sleep 3
-        local cpu_ip=${cpu_index_ip_map[${index}]}
-        local cpu_cmd="ssh ${cpu_ip} \"${REPO_ROOT}/scripts/run_simple_replica.sh ${index} ${CONFIG_FILE}\""
+        local cpu_ip=${cpu_index_ip_map_ref[${index}]}
+        local cpu_cmd="ssh ${cpu_ip} \"cd ${REPO_ROOT}/scripts; ${REPO_ROOT}/scripts/run_simple_replica.sh ${CONFIG_FILE} ${index} \""
         echo "${cpu_cmd} &"
         eval "${cpu_cmd} &"
     done
@@ -70,11 +71,11 @@ startCPUs() {
 }
 
 startFPGAs() {
-    local fpga_ip_index_map=$1
+    local -n fpga_ip_index_map_ref=$1
     echo "Starting the FPGA nodes"
     # start all the FPGA nodes first
-    for key in ${!fpga_ip_index_map[@]}; do
-        local index=${fpga_ip_index_map[${key}]}
+    for key in ${!fpga_ip_index_map_ref[@]}; do
+        local index=${fpga_ip_index_map_ref[${key}]}
         # reset the FPGA
         local reset_cmd="${BEEHIVE_SCRIPTS}/reset_fpga_remote.sh ${SUDO_PASSWD_FILE} fpga_${index}_reset ${CORUNDUM_SCRIPTS} ${FPGA_IP_PCIE[${key}]} ${key}"
         echo ${reset_cmd}
