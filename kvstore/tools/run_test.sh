@@ -20,18 +20,18 @@ srcdir="$HOME/specpaxos"
 logdir="$HOME/specpaxos/logs"
 
 # Machines on which replicas are running.
-replicas=("localhost")
+replicas=("10.100.1.16" "10.100.1.14" "10.100.1.13")
 
 # Machines on which clients are running.
-clients=("localhost")
+clients=("10.100.1.10") #"10.100.1.4")
 
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
 
-nshard=2     # number of shards
-nclient=2    # number of clients to run (per machine)
+nshard=1     # number of shards
+nclient=1    # number of clients to run (per machine)
 nkeys=1000 # number of keys to use
-rtime=10     # duration to run
+rtime=30     # duration to run
 
 wper=50       # writes percentage
 err=0        # error
