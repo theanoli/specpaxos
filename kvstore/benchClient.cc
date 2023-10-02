@@ -36,7 +36,7 @@ main(int argc, char **argv)
     kvstore::Proto mode = kvstore::PROTO_UNKNOWN;
 
     int opt;
-    while ((opt = getopt(argc, argv, "c:d:N:l:w:k:f:m:e:s:p")) != -1) {
+    while ((opt = getopt(argc, argv, "z:c:d:N:l:w:k:f:m:e:p")) != -1) {
         switch (opt) {
         case 'c': // Configuration path
         { 

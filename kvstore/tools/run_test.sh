@@ -17,16 +17,16 @@ trap '{
 
 # Paths to source code and logfiles.
 srcdir="$HOME/specpaxos"
-configdir="$srcdir/kvstore/configs/animal_cluster"
+configdir="$srcdir/kvstore/configs/100gb_cluster"
 logdir="$HOME/specpaxos/logs"
 
 # Machines on which replicas are running.
-# replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")
-replicas=("10.100.1.16" "10.100.1.14" "10.100.1.13")
+replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")
+# replicas=("10.100.1.16" "10.100.1.14" "10.100.1.13")
 
 # Machines on which clients are running.
-# clients=("198.0.0.1" "198.0.0.7") #"10.100.1.4")
-clients=("10.100.1.10" "10.100.1.4")
+clients=("198.0.0.1" "198.0.0.11") #"10.100.1.4")
+# clients=("10.100.1.10" "10.100.1.4")
 
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
@@ -54,7 +54,7 @@ echo "Mode: $mode"
 
 # Generate keys to be used in the experiment.
 echo "Generating random keys.."
-python3 key_generator.py $nkeys > keys
+python3 $srcdir/kvstore/tools/key_generator.py $nkeys > keys
 
 
 for ((i=0; i<$nshard; i++))
@@ -74,9 +74,9 @@ echo "Running the client(s)"
 count=0
 for host in ${clients[@]}
 do
-  ssh $host "$srcdir/kvstore/tools/start_client.sh \"$srcdir/kvstore/$client \
+  ssh $host "mkdir -p $srcdir/logs; $srcdir/kvstore/tools/start_client.sh \"$srcdir/kvstore/$client \
   -c $configdir/shard -N $nshard -f $srcdir/kvstore/tools/keys \
-  -d $rtime -w $wper -k $nkeys -m $mode -e $err -s $skew -z $zalpha\" \
+  -d $rtime -w $wper -k $nkeys -m $mode -e $err -z $zalpha\" \
   $count $nclient $logdir"
 
   let count=$count+$nclient
