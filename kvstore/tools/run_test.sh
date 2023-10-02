@@ -20,10 +20,10 @@ srcdir="$HOME/specpaxos"
 logdir="$HOME/specpaxos/logs"
 
 # Machines on which replicas are running.
-replicas=("10.100.1.16" "10.100.1.14" "10.100.1.13")
+replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")
 
 # Machines on which clients are running.
-clients=("10.100.1.10") #"10.100.1.4")
+clients=("198.0.0.1" "198.0.0.7") #"10.100.1.4")
 
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
@@ -57,7 +57,7 @@ python3 key_generator.py $nkeys > keys
 for ((i=0; i<$nshard; i++))
 do
   echo "Starting shard$i replicas.."
-  $srcdir/kvstore/tools/start_replica.sh shard$i $srcdir/kvstore/tools/shard$i.config \
+  $srcdir/kvstore/tools/start_replica.sh shard$i $srcdir/kvstore/configs/100gb_cluster/shard$i.config \
     "$srcdir/kvstore/replica -m $mode" $logdir
 done
 
@@ -90,10 +90,9 @@ done
 
 # Kill all replicas
 echo "Cleaning up"
-$srcdir/kvstore/tools/stop_replica.sh $srcdir/kvstore/tools/shard.tss.config > /dev/null 2>&1
 for ((i=0; i<$nshard; i++))
 do
-  $srcdir/kvstore/tools/stop_replica.sh $srcdir/kvstore/tools/shard$i.config > /dev/null 2>&1
+  $srcdir/kvstore/tools/stop_replica.sh $srcdir/kvstore/configs/100gb_cluster/shard$i.config > /dev/null 2>&1
 done
 
 
