@@ -17,13 +17,16 @@ trap '{
 
 # Paths to source code and logfiles.
 srcdir="$HOME/specpaxos"
+configdir="$srcdir/kvstore/configs/animal_cluster"
 logdir="$HOME/specpaxos/logs"
 
 # Machines on which replicas are running.
-replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")
+# replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")
+replicas=("10.100.1.16" "10.100.1.14" "10.100.1.13")
 
 # Machines on which clients are running.
-clients=("198.0.0.1" "198.0.0.7") #"10.100.1.4")
+# clients=("198.0.0.1" "198.0.0.7") #"10.100.1.4")
+clients=("10.100.1.10" "10.100.1.4")
 
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
@@ -57,7 +60,7 @@ python3 key_generator.py $nkeys > keys
 for ((i=0; i<$nshard; i++))
 do
   echo "Starting shard$i replicas.."
-  $srcdir/kvstore/tools/start_replica.sh shard$i $srcdir/kvstore/configs/100gb_cluster/shard$i.config \
+  $srcdir/kvstore/tools/start_replica.sh shard$i $configdir/shard$i.config \
     "$srcdir/kvstore/replica -m $mode" $logdir
 done
 
@@ -72,7 +75,7 @@ count=0
 for host in ${clients[@]}
 do
   ssh $host "$srcdir/kvstore/tools/start_client.sh \"$srcdir/kvstore/$client \
-  -c $srcdir/kvstore/tools/shard -N $nshard -f $srcdir/kvstore/tools/keys \
+  -c $configdir/shard -N $nshard -f $srcdir/kvstore/tools/keys \
   -d $rtime -w $wper -k $nkeys -m $mode -e $err -s $skew -z $zalpha\" \
   $count $nclient $logdir"
 
@@ -92,7 +95,7 @@ done
 echo "Cleaning up"
 for ((i=0; i<$nshard; i++))
 do
-  $srcdir/kvstore/tools/stop_replica.sh $srcdir/kvstore/configs/100gb_cluster/shard$i.config > /dev/null 2>&1
+  $srcdir/kvstore/tools/stop_replica.sh $configdir/shard$i.config > /dev/null 2>&1
 done
 
 
