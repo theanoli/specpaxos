@@ -19,6 +19,7 @@ trap '{
 srcdir="$HOME/specpaxos"
 configdir="$srcdir/kvstore/configs/100gb_cluster"
 logdir="$HOME/specpaxos/logs"
+keyspath="$HOME/specpaxos/kvstore/tools/keys"
 
 # Machines on which replicas are running.
 replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")
@@ -31,10 +32,10 @@ clients=("198.0.0.1" "198.0.0.11") #"10.100.1.4")
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
 
-nshard=1     # number of shards
+nshard=5     # number of shards
 nclient=1    # number of clients to run (per machine)
 nkeys=1000 # number of keys to use
-rtime=30     # duration to run
+rtime=60     # duration to run
 
 wper=50       # writes percentage
 err=0        # error
@@ -51,10 +52,23 @@ echo "Zipf alpha: $zalpha"
 echo "Client: $client"
 echo "Mode: $mode"
 
+# Distribute the config files to the client and host machines
+for host in ${clients[@]}
+do
+  scp $configdir/*.config $host:$configdir
+done
+for host in ${replicas[@]}
+do
+  scp $configdir/*.config $host:$configdir
+done
 
 # Generate keys to be used in the experiment.
 echo "Generating random keys.."
-python3 $srcdir/kvstore/tools/key_generator.py $nkeys > keys
+python3 $srcdir/kvstore/tools/key_generator.py $nkeys > $keyspath
+for host in ${clients[@]}
+do
+  scp $keyspath $host:$keyspath
+done
 
 
 for ((i=0; i<$nshard; i++))
@@ -101,6 +115,10 @@ done
 
 # Process logs
 echo "Processing logs"
+for host in ${clients[@]}
+do
+  scp $host:"$logdir/client.*.log" .
+done
 cat $logdir/client.*.log | sort -g -k 3 > $logdir/client.log
 rm -f $logdir/client.*.log
 

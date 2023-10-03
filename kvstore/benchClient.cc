@@ -28,7 +28,7 @@ main(int argc, char **argv)
     int nShards = 1;
     int writePercentage = 50; // Out of 100
     int error = 0; // error bars
-	bool populate = false;
+    bool populate = false;
 
     vector<string> keys;
     string key, value;
@@ -44,12 +44,12 @@ main(int argc, char **argv)
             break;
         }
 
-		case 'p': 
-		{
-			fprintf(stdout, "I am populating the kvstore!\n");
-			populate = true;
-			break;
-		}
+	case 'p': 
+	{
+		fprintf(stdout, "I am populating the kvstore!\n");
+		populate = true;
+		break;
+	}
 
         case 'f': // Generated keys path
         { 
@@ -153,9 +153,6 @@ main(int argc, char **argv)
     kvstore::Client client(mode, configPath, nShards);
 
     // Read in the keys from a file and populate the key-value store.
-	// TS the key-value store is never actually populated here. Any GETs of keys
-	// not previously PUT are going to fail. But we probably shouldn't PUT all the
-	// keys here, because there may be many clients starting up. 
     ifstream in;
     in.open(keysPath);
     if (!in) {
@@ -169,7 +166,7 @@ main(int argc, char **argv)
 			client.Put(key, key);
 		}
     }
-	fprintf(stdout, "Done populating the kvstore...\n");
+    fprintf(stdout, "Done populating the kvstore...\n");
     in.close();
 
     
