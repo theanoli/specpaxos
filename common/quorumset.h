@@ -32,6 +32,8 @@
 #ifndef _COMMON_QUORUMSET_H_
 #define _COMMON_QUORUMSET_H_
 
+#include "lib/message.h"
+
 namespace specpaxos {
     
 template <class IDTYPE, class MSGTYPE>
@@ -87,6 +89,7 @@ public:
         std::map<int, MSGTYPE> &vsmessages = messages[vs];
         if (vsmessages.find(replicaIdx) != vsmessages.end()) {
             // This is a duplicate message
+            Notice("received a duplicate message from replica %d\n", replicaIdx);
 
             // But we'll ignore that, replace the old message from
             // this replica, and proceed.

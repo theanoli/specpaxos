@@ -17,7 +17,7 @@ runClients() {
     local payload_size=${5}
     local warmup_period=${6}
 
-    local CMD="${CLIENT_BINARY} -c ${config_path} -m vrw -n ${num_reqs} -t ${NUM_THREADS} -f ${req_latencies_file} -s ${payload_size}"
+    local CMD="${CLIENT_BINARY} -c ${config_path} -m vrw -n ${num_reqs} -t ${NUM_THREADS} -f ${req_latencies_file} -s ${payload_size} -w ${warmup_period}"
     echo ${CMD}
     eval ${CMD}
 }
