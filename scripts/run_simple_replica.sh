@@ -17,7 +17,7 @@ runReplica() {
 
     local config="${CONFIG_DIR}/${config_file}"
 
-    local cmd="sudo taskset -c 0 ${SERVER_BINARY} -c ${config} -m vrw -i ${replica_index}"
+    local cmd="cat ~/specpaxos/scripts/passwd | sudo -S taskset -c 0 ${SERVER_BINARY} -c ${config} -m vrw -i ${replica_index}"
     echo "${cmd}"
     eval "${cmd}"
 }
