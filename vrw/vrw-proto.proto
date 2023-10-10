@@ -15,17 +15,15 @@ message ReplyMessage {
 
 message ValidateRequestMessage {
     required uint64 view = 1;
-	required uint64 replicaIdx = 2;
-	required uint64 clientid = 3;
-    required uint64 clientreqid = 4;
-	required uint64 opnum = 5;
+	required uint64 clientid = 2;
+    required uint64 clientreqid = 3;
 }
 
 // TODO
 message ValidateReplyMessage {
-	required uint64 clientid = 1;
-    required uint64 clientreqid = 2;
-	required bool isValid = 3;
+	required bool isValid = 1;
+	required uint64 clientid = 2;
+    required uint64 clientreqid = 3;
 }
 
 message UnloggedRequestMessage {

@@ -62,7 +62,8 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
       prepareOKQuorum(config.QuorumSize()-1),
       startViewChangeQuorum(config.QuorumSize()-1),
       doViewChangeQuorum(config.QuorumSize()-1),
-      recoveryResponseQuorum(config.QuorumSize())
+      recoveryResponseQuorum(config.QuorumSize(),
+      validateReadQuorum(config.QuorumSize()-1))
 {
     this->status = STATUS_NORMAL;
     this->view = 0;
@@ -586,17 +587,14 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
 		p.set_clientid(msg.req().clientid());  // Use client_id and client_req_id as labels? 
 		p.set_clientreqid(msg.req().clientreqid());
 		p.set_opnum(this->lastCommitted);
-		// We need to be sure that everyone agrees the last committed entry was committed by
-		// this leader AND that the last committed entry from this leader is the last committed
-		// entry by anyone. There can be pending requests that have been e.g. PREPAREd, but since 
-		// they haven't completed, they are concurrent with the read request.
-		const LogEntry *entry = log.Find(this->lastCommitted);
-		ASSERT(log.Find(this->lastCommitted) == NULL);  // TODO stopped here
+		// If everyone agrees that this leader is the leader, then we are done; if this leader
+		// is the leader (i.e., replicas' view numbers have been updated to this replica's view
+		// number and this replica is in the NORMAL state), then it has received and applied all 
+		// committed state. 
 		
 		if (!(transport->SendMessageToAll(this, p))) {
 			RWarning("Failed to send validate message to all replicas");
 		}
-
     } else {
 		/*
         Request request;
@@ -635,22 +633,45 @@ void
 VRWReplica::HandleValidateRequest(const TransportAddress &remote,
 									const ValidateRequestMessage &msg)
 {
-	// TODO
-	// OK to do this even if status is not normal. 
-	opnum_t opnum = msg.opnum();	
-	const LogEntry *entry = log.Find(opnum);
-	if (entry->viewstamp.opnum == opnum && 
-			entry->viewstamp.view == msg.replicaidx()
+	// TODO make sure the validateReadQuorum is set correctly
+    if (status != STATUS_NORMAL) {
+		// Cannot do this in the middle of a view change
+        RNotice("Ignoring validate request due to abnormal status");
+        return;
+    }
 
-	ASSERT(entry->viewstamp.opnum == newEntry.opnum());
-	ASSERT(entry->viewstamp.view == newEntry.view());
+	bool isvalid = msg.view() == this->view; 
+	if (!isvalid) {
+		RNotice("The replica requesting validation is not the leader!");
+	}
+	
+    ValidateReplyMessage reply;
+	reply.set_isvalid(isvalid);
+    reply.set_clientid(msg.clientid());
+    reply.set_clientreqid(msg.clientreqid());
+
+	if (!(transport->SendMessageToReplica(this,
+										  configuration.GetLeaderIndex(msg.view),
+										  reply))) {
+		RWarning("Failed to send validate message to leader");
+	}
 }
 
 void
 VRWReplica::HandleValidateResponse(const TransportAddress &remote,
 									const ValidateResponseMessage &msg)
 {
-	// TODO
+	// I think we can still validate if the status is not normal.
+	// The read was stored while the replica was the leader; if it was valid 
+	// then, it is valid now. 
+	// TODO make sure we clear validateReadQuorum at the right time(s)
+    auto msgs = validateReadQuorum.AddAndCheckForQuorum(msg.nonce(),
+                                                            msg.replicaidx(),
+                                                            msg);
+    if (msgs != NULL) {
+		// TODO process the validation: respond to client, update client table or 
+		// erase the read from table, clear quorum? 
+    }
 }
 
 void

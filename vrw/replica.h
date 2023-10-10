@@ -90,6 +90,9 @@ private:
     QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
     QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
     QuorumSet<uint64_t, proto::RecoveryResponseMessage> recoveryResponseQuorum;
+	
+	// Key is std::pair<clientid, clientreqid>
+    QuorumSet<std::pair<uint64_t, uint64_t>, proto::PrepareOKMessage> validateReadQuorum;
 
     Timeout *viewChangeTimeout;
     Timeout *nullCommitTimeout;
