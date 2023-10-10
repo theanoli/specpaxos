@@ -444,6 +444,12 @@ VRWReplica::ReceiveMessage(const TransportAddress &remote,
     if (type == request.GetTypeName()) {
         request.ParseFromString(data);
         HandleRequest(remote, request);
+	} else if (type == validateRequest.GetTypeName()) {
+		validateRequest.ParseFromString(data); 
+		HandleValidateRequest(remote, validateRequest);
+	} else if (type == validateResponse.GetTypeName()) {
+		validateResponse.ParseFromString(data); 
+		HandleValidateResponse(remote, validateRequest);
     } else if (type == unloggedRequest.GetTypeName()) {
         unloggedRequest.ParseFromString(data);
         HandleUnloggedRequest(remote, unloggedRequest);
@@ -555,24 +561,49 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
     ClientTableEntry &cte =
         clientTable[msg.req().clientid()];
 
-    // Check whether this request should be committed to replicas
-    if (!replicate) {
-        RDebug("Executing request failed. Not committing to replicas");
-        ReplyMessage reply;
+	// Check whether this is a stealth read. This is NOT the same as an unlogged operation.
+	// The current leader must prove leadership at the time the write returned by this request
+	// was committed. 
+	Request request;
+	request.set_op(res);
+	request.set_clientid(msg.req().clientid());
+	request.set_clientreqid(msg.req().clientreqid());
 
-        reply.set_reply(res);
-        reply.set_view(0);
-        reply.set_opnum(0);
-        reply.set_clientreqid(msg.req().clientreqid());
-        cte.replied = true;
+    if (!replicate) {
+		// TODO do we need to update lastReqId in the client table? 
+		ReplyMessage reply; 
+		Execute(lastCommitted, request, reply);
+        cte.replied = false;
         cte.reply = reply;
-        transport->SendMessage(this, remote, reply);
-        Latency_EndType(&requestLatency, 'f');
+		
+		// Send the ValidateRequestMessage here. 
+		RDebug("Sending confirmation of leader-ship to other replicas");
+		/* Send prepare messages */
+		ValidateRequestMessage p;
+		// View, label (how to match with an outstanding req; use client/client reqid), 
+		// val_id (how to match with op in the oplog)
+		p.set_replicaIdx(myIdx);
+		p.set_clientid(msg.req().clientid());  // Use client_id and client_req_id as labels? 
+		p.set_clientreqid(msg.req().clientreqid());
+		p.set_opnum(this->lastCommitted);
+		// We need to be sure that everyone agrees the last committed entry was committed by
+		// this leader AND that the last committed entry from this leader is the last committed
+		// entry by anyone. There can be pending requests that have been e.g. PREPAREd, but since 
+		// they haven't completed, they are concurrent with the read request.
+		const LogEntry *entry = log.Find(this->lastCommitted);
+		ASSERT(log.Find(this->lastCommitted) == NULL);  // TODO stopped here
+		
+		if (!(transport->SendMessageToAll(this, p))) {
+			RWarning("Failed to send validate message to all replicas");
+		}
+
     } else {
+		/*
         Request request;
         request.set_op(res);
         request.set_clientid(msg.req().clientid());
         request.set_clientreqid(msg.req().clientreqid());
+		*/
     
         /* Assign it an opnum */
         ++this->lastOp;
@@ -594,10 +625,32 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
                 closeBatchTimeout->Start();
             }
         }
-
-        nullCommitTimeout->Reset();
-        Latency_End(&requestLatency);
     }
+
+	nullCommitTimeout->Reset();
+	Latency_End(&requestLatency);
+}
+
+void
+VRWReplica::HandleValidateRequest(const TransportAddress &remote,
+									const ValidateRequestMessage &msg)
+{
+	// TODO
+	// OK to do this even if status is not normal. 
+	opnum_t opnum = msg.opnum();	
+	const LogEntry *entry = log.Find(opnum);
+	if (entry->viewstamp.opnum == opnum && 
+			entry->viewstamp.view == msg.replicaidx()
+
+	ASSERT(entry->viewstamp.opnum == newEntry.opnum());
+	ASSERT(entry->viewstamp.view == newEntry.view());
+}
+
+void
+VRWReplica::HandleValidateResponse(const TransportAddress &remote,
+									const ValidateResponseMessage &msg)
+{
+	// TODO
 }
 
 void

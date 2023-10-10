@@ -45,6 +45,21 @@ Server::ReplicaUpcall(opnum_t opnum, const string &str1, string &str2)
 
 }
 
+void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate, string &res)
+{
+	Request request;
+	request.ParseFromString(op);
+	
+	// We are doing a stealth read; do not replicate
+	if (stealth_reads && request.op() == Request::GET) {
+		replicate = false;
+		res = op;
+	} else {
+		replicate = true;
+		res = op; 
+	}
+}
+
 static void Usage(const char *progName)
 {
     fprintf(stderr, "usage: %s -c conf-file -i replica-index\n",
@@ -67,8 +82,13 @@ main(int argc, char **argv)
 
   // Parse arguments
     int opt;
-    while ((opt = getopt(argc, argv, "c:i:m:")) != -1) {
+    while ((opt = getopt(argc, argv, "c:i:m:s")) != -1) {
         switch (opt) {
+			case 's': 
+				// Reads should not be logged but should be consistent
+				stealth_reads = true;
+				break; 
+
             case 'c':
                 configPath = optarg;
                 break;
