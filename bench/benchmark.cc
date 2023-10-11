@@ -63,7 +63,9 @@ BenchmarkClient::BenchmarkClient(Client &client, Transport &transport,
     done = false;
     cooldownDone = false;
     _Latency_Init(&latency, "op");
-    latencies.reserve(numRequests);
+    if (!requestsAreTimeNotReqs) {
+	    latencies.reserve(numRequests);
+    }
 }
 
 void
@@ -123,7 +125,6 @@ BenchmarkClient::OnReply(const string &request, const string &reply)
 
     if ((started) && (!done) && (n != 0)) {
         uint64_t ns = Latency_End(&latency);
-	printf("it's %ld\n", totalTime);
 	realNumReqs++;
         latencies.push_back(ns);
 	if (requestsAreTimeNotReqs) {

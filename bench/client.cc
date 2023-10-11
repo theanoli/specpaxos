@@ -150,7 +150,7 @@ int main(int argc, char **argv)
         case 'n':
         {
             char *strtolPtr;
-            numRequests = strtoul(optarg, &strtolPtr, 10);
+            numRequests = strtoull(optarg, &strtolPtr, 10);
             if ((*optarg == '\0') || (*strtolPtr != '\0') ||
                 (numRequests <= 0))
             {
