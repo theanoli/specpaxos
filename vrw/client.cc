@@ -123,7 +123,7 @@ VRWClient::SendRequest()
     reqMsg.mutable_req()->set_clientreqid(pendingRequest->clientReqId);
     
     // XXX Try sending only to (what we think is) the leader first
-    transport->SendMessageToReplicas(this, reqMsg);
+    transport->SendMessageToReplica(this, 0, reqMsg);
     
     requestTimeout->Reset();
 }
