@@ -38,7 +38,7 @@ class BenchmarkClient
 {
 public:
     BenchmarkClient(Client &client, Transport &transport,
-                    int numRequests, uint64_t delay,
+                    uint64_t numRequests, uint64_t delay,
                     int warmupSec,
                     uint64_t payload_size,
 		    bool requestsAreTimeNotReqs,
@@ -59,16 +59,17 @@ private:
     void CooldownDone();
     Client &client;
     Transport &transport;
-    int numRequests;
+    uint64_t numRequests;
     uint64_t payload_size;
     uint64_t delay;
-    int n;
+    uint64_t n;
     int warmupSec;
     struct timeval startTime;
     struct timeval endTime;
     string latencyFilename;
     bool requestsAreTimeNotReqs;
     uint64_t totalTime;
+    uint64_t realNumReqs;
 };
 
 } // namespace specpaxos

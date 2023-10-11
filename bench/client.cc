@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 {
     const char *configPath = NULL;
     int numClients = 1;
-    int numRequests = 100;
+    uint64_t numRequests = 100;
     int warmupSec = 0;
     int dscp = 0;
     uint64_t delay = 0;

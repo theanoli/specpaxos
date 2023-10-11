@@ -46,7 +46,7 @@ namespace specpaxos {
 DEFINE_LATENCY(op);
 
 BenchmarkClient::BenchmarkClient(Client &client, Transport &transport,
-                                 int numRequests, uint64_t delay,
+                                 uint64_t numRequests, uint64_t delay,
                                  int warmupSec,
                                  uint64_t payload_size,
 				 bool requestsAreTimeNotReqs,
@@ -80,11 +80,12 @@ void
 BenchmarkClient::WarmupDone()
 {
     started = true;
-    Notice("Completed warmup period of %d seconds with %d requests",
+    Notice("Completed warmup period of %d seconds with %ld requests",
            warmupSec, n);
     gettimeofday(&startTime, NULL);
     n = 0;
     totalTime = 0;
+    realNumReqs = 0;
 }
 
 void
@@ -122,6 +123,7 @@ BenchmarkClient::OnReply(const string &request, const string &reply)
     
     if ((started) && (!done) && (n != 0)) {
         uint64_t ns = Latency_End(&latency);
+	realNumReqs++;
         latencies.push_back(ns);
 	if (requestsAreTimeNotReqs) {
 	    if (totalTime > numRequests) {
@@ -152,8 +154,8 @@ BenchmarkClient::Finish()
     
     struct timeval diff = timeval_sub(endTime, startTime);
 
-    Notice("Completed %d requests in " FMT_TIMEVAL_DIFF " seconds",
-           numRequests, VA_TIMEVAL_DIFF(diff));
+    Notice("Completed %ld requests in " FMT_TIMEVAL_DIFF " seconds",
+           realNumReqs, VA_TIMEVAL_DIFF(diff));
     done = true;
 
     transport.Timer(warmupSec * 1000,
