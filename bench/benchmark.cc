@@ -49,11 +49,12 @@ BenchmarkClient::BenchmarkClient(Client &client, Transport &transport,
                                  int numRequests, uint64_t delay,
                                  int warmupSec,
                                  uint64_t payload_size,
+				 bool requestsAreTimeNotReqs,
                                  string latencyFilename
                                 )
     : client(client), transport(transport),
       numRequests(numRequests), delay(delay),
-      warmupSec(warmupSec), latencyFilename(latencyFilename), payload_size(payload_size)
+      warmupSec(warmupSec), latencyFilename(latencyFilename), requestsAreTimeNotReqs(requestsAreTimeNotReqs), payload_size(payload_size)
 {
     if (delay != 0) {
         Notice("Delay between requests: %" PRIu64 " ms", delay);        
@@ -83,6 +84,7 @@ BenchmarkClient::WarmupDone()
            warmupSec, n);
     gettimeofday(&startTime, NULL);
     n = 0;
+    totalTime = 0;
 }
 
 void
@@ -121,9 +123,16 @@ BenchmarkClient::OnReply(const string &request, const string &reply)
     if ((started) && (!done) && (n != 0)) {
         uint64_t ns = Latency_End(&latency);
         latencies.push_back(ns);
-        if (n > numRequests) {
-            Finish();
-        }
+	if (requestsAreTimeNotReqs) {
+	    if (totalTime > numRequests) {
+		Finish();
+	    }
+	} else {
+            if (n > numRequests) {
+                Finish();
+            }
+	}
+	totalTime += ns;
     }
     
     n++;

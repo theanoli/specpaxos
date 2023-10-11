@@ -41,6 +41,7 @@ public:
                     int numRequests, uint64_t delay,
                     int warmupSec,
                     uint64_t payload_size,
+		    bool requestsAreTimeNotReqs,
                     string latencyFilename = ""
                    );
     void Start();
@@ -66,6 +67,8 @@ private:
     struct timeval startTime;
     struct timeval endTime;
     string latencyFilename;
+    bool requestsAreTimeNotReqs;
+    uint64_t totalTime;
 };
 
 } // namespace specpaxos
