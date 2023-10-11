@@ -120,13 +120,14 @@ BenchmarkClient::OnReply(const string &request, const string &reply)
     if (cooldownDone) {
         return;
     }
-    
+
     if ((started) && (!done) && (n != 0)) {
         uint64_t ns = Latency_End(&latency);
+	printf("it's %ld\n", totalTime);
 	realNumReqs++;
         latencies.push_back(ns);
 	if (requestsAreTimeNotReqs) {
-	    if (totalTime > numRequests) {
+	    if (/*ns */totalTime > numRequests) {
 		Finish();
 	    }
 	} else {
