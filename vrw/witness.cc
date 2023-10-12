@@ -265,6 +265,7 @@ VRWWitness::ReceiveMessage(const TransportAddress &remote,
     static UnloggedRequestMessage unloggedRequest;
     static PrepareMessage prepare;
     static PrepareOKMessage prepareOK;
+	static ValidateRequestMessage validateRequest;
     static CommitMessage commit;
     static RequestStateTransferMessage requestStateTransfer;
     static StateTransferMessage stateTransfer;
@@ -283,6 +284,9 @@ VRWWitness::ReceiveMessage(const TransportAddress &remote,
 		RDebug("Ignoring unlogged request because I am a witness");
 		Latency_EndType(&requestLatency, 'i');
         unloggedRequest.ParseFromString(data);
+	} else if (type == validateRequest.GetTypeName()) {
+		validateRequest.ParseFromString(data);
+		HandleValidateRequest(remote, validateRequest);
     } else if (type == prepare.GetTypeName()) {
         prepare.ParseFromString(data);
         HandlePrepare(remote, prepare);
@@ -323,6 +327,39 @@ VRWWitness::ReceiveMessage(const TransportAddress &remote,
         RPanic("Received unexpected message type in VRW proto: %s",
               type.c_str());
     }
+}
+
+void
+VRWWitness::HandleValidateRequest(const TransportAddress &remote,
+									const ValidateRequestMessage &msg)
+{
+    if (status != STATUS_NORMAL) {
+		// Cannot do this in the middle of a view change
+        RNotice("Ignoring validate request due to abnormal status");
+        return;
+    }
+
+	bool isvalid = false; 
+	if (this->view > msg.view()) {
+		RNotice("We went through a view change after validation was sent! Refusing to validate"); 
+	} else if (this->view < msg.view()) {
+		// OK to drop here; others will validate instead, since a quorum accepted
+		// the viewchange already
+		RNotice("We are lagging in viewchanges; dropping validation request");
+		return;
+	} else {
+		isvalid = true;
+	}
+	
+    ValidateReplyMessage reply;
+	reply.set_replicaidx(myIdx); 
+	reply.set_isvalid(isvalid);
+    reply.set_clientid(msg.clientid());
+    reply.set_clientreqid(msg.clientreqid());
+
+	if (!(transport->SendMessage(this, remote, reply))) {
+		RWarning("Failed to send validate message to leader");
+	}
 }
 
 void

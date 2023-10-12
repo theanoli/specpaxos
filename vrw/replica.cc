@@ -594,7 +594,7 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
 		cte.needsReadValidation = true;
 		
 		// Send the ValidateRequestMessage here. 
-		RDebug("Sending confirmation of leader-ship to other replicas");
+		RDebug("Sending request to confirm leader-ship to other replicas");
 		/* Send validate messages */
 		ValidateRequestMessage p;
 		p.set_view(this->view);  // How to tell leader was leader when read was done
@@ -643,16 +643,16 @@ VRWReplica::HandleValidateRequest(const TransportAddress &remote,
         return;
     }
 
-	bool isvalid = msg.view() == this->view; 
-	if (!isvalid) {
-		if (msg.view() > this->view) {
-			RNotice("We went through a view change after validation was sent! Refusing to validate"); 
-		} else {
-			// OK to drop here; others will validate instead, since a quorum accepted
-			// the viewchange already
-			RNotice("We are lagging in viewchanges; dropping validation request");
-			return;
-		}
+	bool isvalid = false; 
+	if (this->view > msg.view()) {
+		RNotice("We went through a view change after validation was sent! Refusing to validate"); 
+	} else if (this->view < msg.view()) {
+		// OK to drop here; others will validate instead, since a quorum accepted
+		// the viewchange already
+		RNotice("We are lagging in viewchanges; dropping validation request");
+		return;
+	} else {
+		isvalid = true;
 	}
 	
     ValidateReplyMessage reply;
@@ -661,9 +661,7 @@ VRWReplica::HandleValidateRequest(const TransportAddress &remote,
     reply.set_clientid(msg.clientid());
     reply.set_clientreqid(msg.clientreqid());
 
-	if (!(transport->SendMessageToReplica(this,
-										  configuration.GetLeaderIndex(msg.view()),
-										  reply))) {
+	if (!(transport->SendMessage(this, remote, reply))) {
 		RWarning("Failed to send validate message to leader");
 	}
 }
@@ -687,8 +685,11 @@ VRWReplica::HandleValidateReply(const TransportAddress &remote,
 	// 		election and it was successful. 
 	//
     if (msgs != NULL) {
-		// TODO process the validation: respond to client, update client table or 
-		// erase the read from table, clear quorum? 
+		// Extra validation response we do not need to bother with. If we have reached a 
+		// quorum already, any nodes that respond will not respond with a NACK even if
+		// they advance to a new view (unless a bunch of time has passed and the whole system
+		// has moved on to a new view since the validation-seeker got responses from the
+		// quorum, but anyway those validations are still... valid)
         if (msgs->size() >= (unsigned)configuration.QuorumSize()) {
             return;
         }

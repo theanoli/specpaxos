@@ -181,8 +181,13 @@ main(int argc, char **argv)
 		case PROTO_VRW:
 			// TODO witness
 			server = kvstore::Server();
-            replica = new specpaxos::vrw::VRWReplica(config, index, true,
-                                                   &transport, 1, &server);
+			if (specpaxos::IsWitness(index)) {
+				replica = new specpaxos::vrw::VRWWitness(config, index, true,
+													   &transport, 1, &server);
+			} else {
+				replica = new specpaxos::vrw::VRWReplica(config, index, true,
+													   &transport, 1, &server);
+			}
             break;
 
 		case PROTO_SPEC:
