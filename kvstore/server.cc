@@ -177,7 +177,9 @@ main(int argc, char **argv)
             replica = new specpaxos::vr::VRReplica(config, index, true,
                                                    &transport, 1, &server);
             break;
+			
 		case PROTO_VRW:
+			// TODO witness
 			server = kvstore::Server();
             replica = new specpaxos::vrw::VRWReplica(config, index, true,
                                                    &transport, 1, &server);

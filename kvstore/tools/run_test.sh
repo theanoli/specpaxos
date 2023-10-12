@@ -17,27 +17,29 @@ trap '{
 
 # Paths to source code and logfiles.
 srcdir="$HOME/specpaxos"
-configdir="$srcdir/kvstore/configs/100gb_cluster"
+configdir="$srcdir/kvstore/configs/local"
 logdir="$HOME/specpaxos/logs"
 keyspath="$HOME/specpaxos/kvstore/tools/keys"
 
 # Machines on which replicas are running.
-replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")
+# replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")
 # replicas=("10.100.1.16" "10.100.1.14" "10.100.1.13")
+replicas=("localhost" "localhost" "localhost")
 
 # Machines on which clients are running.
-clients=("198.0.0.1" "198.0.0.11") #"10.100.1.4")
+# clients=("198.0.0.1" "198.0.0.11") #"10.100.1.4")
 # clients=("10.100.1.10" "10.100.1.4")
+clients=("localhost" "localhost")
 
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
 
-nshard=5     # number of shards
+nshard=1     # number of shards
 nclient=1    # number of clients to run (per machine)
 nkeys=1000 # number of keys to use
 rtime=60     # duration to run
 
-wper=50       # writes percentage
+wper=10       # writes percentage
 err=0        # error
 zalpha=0.9    # zipf alpha (-1 to disable zipf and enable uniform)
 
@@ -63,7 +65,7 @@ do
 done
 
 # Generate keys to be used in the experiment.
-echo "Generating random keys.."
+echo "Generating random keys..."
 python3 $srcdir/kvstore/tools/key_generator.py $nkeys > $keyspath
 for host in ${clients[@]}
 do
@@ -73,9 +75,9 @@ done
 
 for ((i=0; i<$nshard; i++))
 do
-  echo "Starting shard$i replicas.."
+  echo "Starting replicas for $i shards..."
   $srcdir/kvstore/tools/start_replica.sh shard$i $configdir/shard$i.config \
-    "$srcdir/kvstore/replica -m $mode" $logdir
+    "$srcdir/kvstore/replica -m $mode -s" $logdir
 done
 
 

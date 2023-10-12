@@ -585,6 +585,10 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
     if (!replicate) {
 		ReplyMessage reply; 
 		Execute(lastCommitted, request, reply);
+		reply.set_view(view);
+		reply.set_opnum(0);
+		reply.set_clientreqid(msg.req().clientreqid());
+
         cte.replied = false;
         cte.reply = reply;
 		cte.needsReadValidation = true;
@@ -685,6 +689,10 @@ VRWReplica::HandleValidateReply(const TransportAddress &remote,
     if (msgs != NULL) {
 		// TODO process the validation: respond to client, update client table or 
 		// erase the read from table, clear quorum? 
+        if (msgs->size() >= (unsigned)configuration.QuorumSize()) {
+            return;
+        }
+
         for (const auto &kv : *msgs) {
 			if (!kv.second.isvalid()) {
 				RDebug("Another replica NACKed the validate request! Not servicing read");
@@ -696,6 +704,8 @@ VRWReplica::HandleValidateReply(const TransportAddress &remote,
 		ClientTableEntry &cte = clientTable[msg.clientid()];
 		ASSERT(cte.reply.clientreqid() == msg.clientreqid());
 		cte.replied = true;
+		RNotice("About to respond with validated read for client %lu, reqid %lu, view %lu",
+				msg.clientid(), cte.reply.clientreqid(), cte.reply.view());
 
 		/* Send reply */
 		auto iter = clientAddresses.find(msg.clientid());
