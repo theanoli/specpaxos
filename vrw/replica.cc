@@ -62,8 +62,8 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
       prepareOKQuorum(config.QuorumSize()-1),
       startViewChangeQuorum(config.QuorumSize()-1),
       doViewChangeQuorum(config.QuorumSize()-1),
-      recoveryResponseQuorum(config.QuorumSize(),
-      validateReadQuorum(config.QuorumSize()-1))
+      recoveryResponseQuorum(config.QuorumSize()),
+      validateReadQuorum(config.QuorumSize()-1)
 {
     this->status = STATUS_NORMAL;
     this->view = 0;
@@ -99,6 +99,9 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
     this->resendPrepareTimeout = new Timeout(transport, 500, [this]() {
             ResendPrepare();
         });
+    this->resendValidateTimeout = new Timeout(transport, 500, [this]() {
+            ResendValidate();
+        });
     this->closeBatchTimeout = new Timeout(transport, 300, [this]() {
             CloseBatch();
         });
@@ -132,6 +135,7 @@ VRWReplica::~VRWReplica()
     delete nullCommitTimeout;
     delete stateTransferTimeout;
     delete resendPrepareTimeout;
+	delete resendValidateTimeout;
     delete closeBatchTimeout;
     delete recoveryTimeout;
     
@@ -301,6 +305,7 @@ VRWReplica::EnterView(view_t newview)
         viewChangeTimeout->Start();
         nullCommitTimeout->Stop();
         resendPrepareTimeout->Stop();
+        resendValidateTimeout->Stop();
         closeBatchTimeout->Stop();
     }
 
@@ -308,6 +313,7 @@ VRWReplica::EnterView(view_t newview)
     startViewChangeQuorum.Clear();
     doViewChangeQuorum.Clear();
     recoveryResponseQuorum.Clear();
+	validateReadQuorum.Clear();
 }
 
 void
@@ -322,6 +328,7 @@ VRWReplica::StartViewChange(view_t newview)
     viewChangeTimeout->Reset();
     nullCommitTimeout->Stop();
     resendPrepareTimeout->Stop();
+	resendValidateTimeout->Stop();
     closeBatchTimeout->Stop();
 
     StartViewChangeMessage m;
@@ -363,6 +370,7 @@ VRWReplica::UpdateClientTable(const Request &req)
     entry.lastReqId = req.clientreqid();
     entry.replied = false;
     entry.reply.Clear();
+	entry.needsReadValidation = false;
 }
 
 void
@@ -433,6 +441,8 @@ VRWReplica::ReceiveMessage(const TransportAddress &remote,
     static UnloggedRequestMessage unloggedRequest;
     static PrepareMessage prepare;
     static PrepareOKMessage prepareOK;
+	static ValidateRequestMessage validateRequest;
+	static ValidateReplyMessage validateReply;
     static CommitMessage commit;
     static RequestStateTransferMessage requestStateTransfer;
     static StateTransferMessage stateTransfer;
@@ -448,9 +458,9 @@ VRWReplica::ReceiveMessage(const TransportAddress &remote,
 	} else if (type == validateRequest.GetTypeName()) {
 		validateRequest.ParseFromString(data); 
 		HandleValidateRequest(remote, validateRequest);
-	} else if (type == validateResponse.GetTypeName()) {
-		validateResponse.ParseFromString(data); 
-		HandleValidateResponse(remote, validateRequest);
+	} else if (type == validateReply.GetTypeName()) {
+		validateReply.ParseFromString(data); 
+		HandleValidateReply(remote, validateReply);
     } else if (type == unloggedRequest.GetTypeName()) {
         unloggedRequest.ParseFromString(data);
         HandleUnloggedRequest(remote, unloggedRequest);
@@ -539,10 +549,12 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
                 Latency_EndType(&requestLatency, 'r');
                 return;
             } else {
-                RNotice("Received duplicate request %lu:" FMT_OPNUM " but no reply available; ignoring", 
-						msg.req().clientid(), msg.req().clientreqid());
-                Latency_EndType(&requestLatency, 'd');
-                return;
+				if (!entry.needsReadValidation) {
+					RNotice("Received duplicate request %lu:" FMT_OPNUM " but no reply available; ignoring", 
+							msg.req().clientid(), msg.req().clientreqid());
+					Latency_EndType(&requestLatency, 'd');
+					return;
+				}
             }
         }
 		RDebug("Last reqID for client %lu: " FMT_OPNUM, msg.req().clientid(), entry.lastReqId);
@@ -563,46 +575,34 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
         clientTable[msg.req().clientid()];
 
 	// Check whether this is a stealth read. This is NOT the same as an unlogged operation.
-	// The current leader must prove leadership at the time the write returned by this request
-	// was committed. 
+	// The current leader must prove leadership at the time the read was done: this proves
+	// the replica had the most up-to-date version of the database at read time. 
 	Request request;
 	request.set_op(res);
 	request.set_clientid(msg.req().clientid());
 	request.set_clientreqid(msg.req().clientreqid());
 
     if (!replicate) {
-		// TODO do we need to update lastReqId in the client table? 
 		ReplyMessage reply; 
 		Execute(lastCommitted, request, reply);
         cte.replied = false;
         cte.reply = reply;
+		cte.needsReadValidation = true;
 		
 		// Send the ValidateRequestMessage here. 
 		RDebug("Sending confirmation of leader-ship to other replicas");
-		/* Send prepare messages */
+		/* Send validate messages */
 		ValidateRequestMessage p;
-		// View, label (how to match with an outstanding req; use client/client reqid), 
-		// val_id (how to match with op in the oplog)
-		p.set_replicaIdx(myIdx);
+		p.set_view(this->view);  // How to tell leader was leader when read was done
 		p.set_clientid(msg.req().clientid());  // Use client_id and client_req_id as labels? 
 		p.set_clientreqid(msg.req().clientreqid());
-		p.set_opnum(this->lastCommitted);
-		// If everyone agrees that this leader is the leader, then we are done; if this leader
-		// is the leader (i.e., replicas' view numbers have been updated to this replica's view
-		// number and this replica is in the NORMAL state), then it has received and applied all 
-		// committed state. 
+
+		lastValidate = p; 
 		
 		if (!(transport->SendMessageToAll(this, p))) {
 			RWarning("Failed to send validate message to all replicas");
 		}
     } else {
-		/*
-        Request request;
-        request.set_op(res);
-        request.set_clientid(msg.req().clientid());
-        request.set_clientreqid(msg.req().clientreqid());
-		*/
-    
         /* Assign it an opnum */
         ++this->lastOp;
         v.view = this->view;
@@ -633,7 +633,6 @@ void
 VRWReplica::HandleValidateRequest(const TransportAddress &remote,
 									const ValidateRequestMessage &msg)
 {
-	// TODO make sure the validateReadQuorum is set correctly
     if (status != STATUS_NORMAL) {
 		// Cannot do this in the middle of a view change
         RNotice("Ignoring validate request due to abnormal status");
@@ -642,35 +641,87 @@ VRWReplica::HandleValidateRequest(const TransportAddress &remote,
 
 	bool isvalid = msg.view() == this->view; 
 	if (!isvalid) {
-		RNotice("The replica requesting validation is not the leader!");
+		if (msg.view() > this->view) {
+			RNotice("We went through a view change after validation was sent! Refusing to validate"); 
+		} else {
+			// OK to drop here; others will validate instead, since a quorum accepted
+			// the viewchange already
+			RNotice("We are lagging in viewchanges; dropping validation request");
+			return;
+		}
 	}
 	
     ValidateReplyMessage reply;
+	reply.set_replicaidx(myIdx); 
 	reply.set_isvalid(isvalid);
     reply.set_clientid(msg.clientid());
     reply.set_clientreqid(msg.clientreqid());
 
 	if (!(transport->SendMessageToReplica(this,
-										  configuration.GetLeaderIndex(msg.view),
+										  configuration.GetLeaderIndex(msg.view()),
 										  reply))) {
 		RWarning("Failed to send validate message to leader");
 	}
 }
 
 void
-VRWReplica::HandleValidateResponse(const TransportAddress &remote,
-									const ValidateResponseMessage &msg)
+VRWReplica::HandleValidateReply(const TransportAddress &remote,
+									const ValidateReplyMessage &msg)
 {
 	// I think we can still validate if the status is not normal.
 	// The read was stored while the replica was the leader; if it was valid 
 	// then, it is valid now. 
-	// TODO make sure we clear validateReadQuorum at the right time(s)
-    auto msgs = validateReadQuorum.AddAndCheckForQuorum(msg.nonce(),
+    auto msgs = validateReadQuorum.AddAndCheckForQuorumOrNack(
+			std::pair<uint64_t, uint64_t>(msg.clientid(), msg.clientreqid()),
                                                             msg.replicaidx(),
                                                             msg);
+	// When we can validate: 
+	// - A quorum of nodes responds with ACKs
+	// When we cannot validate: 
+	// - ANYONE responds with a NACK. Responding with a NACK means they are in the normal state
+	// 		and their view number has advanced, i.e., they went through a round of leader
+	// 		election and it was successful. 
+	//
     if (msgs != NULL) {
 		// TODO process the validation: respond to client, update client table or 
 		// erase the read from table, clear quorum? 
+        for (const auto &kv : *msgs) {
+			if (!kv.second.isvalid()) {
+				RDebug("Another replica NACKed the validate request! Not servicing read");
+				return;
+			}
+        }
+		
+		// TODO respond to the client and do whatever bookkeeping is needed
+		ClientTableEntry &cte = clientTable[msg.clientid()];
+		ASSERT(cte.reply.clientreqid() == msg.clientreqid());
+		cte.replied = true;
+
+		/* Send reply */
+		auto iter = clientAddresses.find(msg.clientid());
+		if (iter != clientAddresses.end()) {
+			transport->SendMessage(this, *iter->second, cte.reply);
+		}
+    }
+}
+
+void
+VRWReplica::ResendValidate()
+{
+	if ((!AmLeader()) || (lastValidate.view() != this->view)) {
+		// Drop if we are not leader anymore; someone else should handle
+		// this request. 
+		// If the view has changed a few times and we're still the leader, the
+		// old read is still valid. But it is easiest to have the client re-send
+		// the read and for this leader to re-do it with an up-to-date value. 
+		// We could handle responses for the same view for multiple outstanding 
+		// validations, but this is complicated and doing it the naive way 
+		// incurs at most as many messages as normal-case processing. 
+        return;
+    }
+    RNotice("Resending last validate message");
+    if (!(transport->SendMessageToAll(this, lastValidate))) {
+        RWarning("Failed to ressend prepare message to all replicas");
     }
 }
 

@@ -43,21 +43,26 @@ Server::ReplicaUpcall(opnum_t opnum, const string &str1, string &str2)
     reply.SerializeToString(&str2);
 }
 
-}
-
-void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate, string &res)
+void Server::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate, string &res)
 {
 	Request request;
 	request.ParseFromString(op);
 	
 	// We are doing a stealth read; do not replicate
-	if (stealth_reads && request.op() == Request::GET) {
+	if (doReadValidation && request.op() == Request::GET) {
 		replicate = false;
 		res = op;
 	} else {
 		replicate = true;
 		res = op; 
 	}
+}
+
+void 
+Server::SetReadValidation(bool do_read_validation)
+{
+	doReadValidation = do_read_validation; 
+}
 }
 
 static void Usage(const char *progName)
@@ -80,13 +85,15 @@ main(int argc, char **argv)
         PROTO_FAST,
     } proto = PROTO_UNKNOWN;
 
+	bool validate_reads = false;
+
   // Parse arguments
     int opt;
     while ((opt = getopt(argc, argv, "c:i:m:s")) != -1) {
         switch (opt) {
 			case 's': 
 				// Reads should not be logged but should be consistent
-				stealth_reads = true;
+				validate_reads = true;
 				break; 
 
             case 'c':
@@ -163,6 +170,7 @@ main(int argc, char **argv)
 
     specpaxos::Replica *replica;
     kvstore::Server server;
+
     switch (proto) {
         case PROTO_VR:
 			server = kvstore::Server();
@@ -190,6 +198,8 @@ main(int argc, char **argv)
             NOT_REACHABLE();
     }
     
+	server.SetReadValidation(validate_reads);
+
     (void)replica;              // silence warning
     transport.Run();
 

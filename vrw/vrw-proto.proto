@@ -24,6 +24,7 @@ message ValidateReplyMessage {
 	required bool isValid = 1;
 	required uint64 clientid = 2;
     required uint64 clientreqid = 3;
+	required uint32 replicaIdx = 4;
 }
 
 message UnloggedRequestMessage {
