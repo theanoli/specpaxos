@@ -59,6 +59,12 @@ message StateTransferMessage {
     repeated LogEntry entries = 3;
 }
 
+message BeehiveStateTransferMessage {
+    required uint64 view = 1;
+    required uint64 opnum = 2;
+    required bytes entries = 3;
+}
+
 message StartViewChangeMessage {
     required uint64 view = 1;
     required uint32 replicaIdx = 2;
@@ -81,6 +87,15 @@ message DoViewChangeMessage {
     repeated LogEntry entries = 6;
 }
 
+message BeehiveDoViewChangeMessage {
+    required uint64 view = 1;
+    required uint64 lastNormalView = 2;
+    required uint64 lastOp = 3;
+    required uint64 lastCommitted = 4;
+    required uint32 replicaIdx = 5;    
+    required bytes  entries = 6;
+}
+
 message StartViewMessage {
     message LogEntry {
         required uint64 view = 1;
@@ -93,6 +108,13 @@ message StartViewMessage {
     required uint64 lastOp = 2;
     required uint64 lastCommitted = 3;
     repeated LogEntry entries = 4;
+}
+
+message BeehiveStartViewMessage {
+    required uint64 view = 1;
+    required uint64 lastOp = 2;
+    required uint64 lastCommitted = 3;
+    required bytes  entries = 4; 
 }
 
 message RecoveryMessage {
