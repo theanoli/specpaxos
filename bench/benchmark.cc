@@ -107,7 +107,8 @@ BenchmarkClient::SendNext()
 
 //    std::ostringstream msg;
 //    msg << "request" << n;
-    string request(request_buf);
+    string request(request_buf, payload_size);
+//    Notice("request size is %lu", request.size());
 
     Latency_Start(&latency);
     client.Invoke(request, std::bind(&BenchmarkClient::OnReply,
