@@ -34,6 +34,7 @@ Server::ReplicaUpcall(opnum_t opnum, const string &str1, string &str2)
 
     case Request::PUT:
         status = store.put(request.arg0(), request.arg1());
+		reply.set_value("");
         break;
 
     default:
@@ -93,6 +94,7 @@ main(int argc, char **argv)
         switch (opt) {
 			case 's': 
 				// Reads should not be logged but should be consistent
+				Notice("Doing read validation!");
 				validate_reads = true;
 				break; 
 

@@ -28,6 +28,11 @@
  *
  **********************************************************************/
 
+/* TODO
+ * May need to move the read validations to a different data structure instead 
+ * of the client table.
+ */
+
 #include "common/replica.h"
 #include "vrw/replica.h"
 #include "vrw/vrw-proto.pb.h"
@@ -99,9 +104,11 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
     this->resendPrepareTimeout = new Timeout(transport, 500, [this]() {
             ResendPrepare();
         });
+	/*
     this->resendValidateTimeout = new Timeout(transport, 500, [this]() {
             ResendValidate();
         });
+		*/
     this->closeBatchTimeout = new Timeout(transport, 300, [this]() {
             CloseBatch();
         });
@@ -135,7 +142,7 @@ VRWReplica::~VRWReplica()
     delete nullCommitTimeout;
     delete stateTransferTimeout;
     delete resendPrepareTimeout;
-	delete resendValidateTimeout;
+	// delete resendValidateTimeout;
     delete closeBatchTimeout;
     delete recoveryTimeout;
     
@@ -202,7 +209,8 @@ VRWReplica::CommitUpTo(opnum_t upto)
 			// at the client, and there's no need to record the
 			// result.
 		}
-		RDebug("Client table entry's last reqID for client %lu: " FMT_OPNUM, entry->request.clientid(), cte.lastReqId);
+		RDebug("Reply size: %ld", reply.ByteSizeLong());
+		RDebug("Sending reply: Client table entry's last reqID for the client %lu: " FMT_OPNUM ", %s", entry->request.clientid(), cte.lastReqId, reply.DebugString().c_str());
 		
 		/* Send reply */
 		auto iter = clientAddresses.find(entry->request.clientid());
@@ -255,7 +263,7 @@ VRWReplica::SendRecoveryMessages()
     m.set_replicaidx(myIdx);
     m.set_nonce(recoveryNonce);
     
-    RNotice("Requesting recovery");
+    RNotice("Sending recovery request");
     if (!transport->SendMessageToAll(this, m)) {
         RWarning("Failed to send Recovery message to all replicas");
     }
@@ -305,7 +313,7 @@ VRWReplica::EnterView(view_t newview)
         viewChangeTimeout->Start();
         nullCommitTimeout->Stop();
         resendPrepareTimeout->Stop();
-        resendValidateTimeout->Stop();
+        // resendValidateTimeout->Stop();
         closeBatchTimeout->Stop();
     }
 
@@ -328,7 +336,7 @@ VRWReplica::StartViewChange(view_t newview)
     viewChangeTimeout->Reset();
     nullCommitTimeout->Stop();
     resendPrepareTimeout->Stop();
-	resendValidateTimeout->Stop();
+	// resendValidateTimeout->Stop();
     closeBatchTimeout->Stop();
 
     StartViewChangeMessage m;
@@ -336,6 +344,7 @@ VRWReplica::StartViewChange(view_t newview)
     m.set_replicaidx(myIdx);
     m.set_lastcommitted(lastCommitted);
 
+	RDebug("Sending StartViewChange");
     if (!transport->SendMessageToAll(this, m)) {
         RWarning("Failed to send StartViewChange message to all replicas");
     }
@@ -350,6 +359,7 @@ VRWReplica::SendNullCommit()
 
     ASSERT(AmLeader());
 
+	RDebug("Sending NullCommit");
     if (!(transport->SendMessageToAll(this, cm))) {
         RWarning("Failed to send null COMMIT message to all replicas");
     }
@@ -627,9 +637,8 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
                 closeBatchTimeout->Start();
             }
         }
+		nullCommitTimeout->Reset();
     }
-
-	nullCommitTimeout->Reset();
 	Latency_End(&requestLatency);
 }
 
@@ -661,6 +670,7 @@ VRWReplica::HandleValidateRequest(const TransportAddress &remote,
     reply.set_clientid(msg.clientid());
     reply.set_clientreqid(msg.clientreqid());
 
+	RDebug("Sending validate response to leader");
 	if (!(transport->SendMessage(this, remote, reply))) {
 		RWarning("Failed to send validate message to leader");
 	}
@@ -705,8 +715,20 @@ VRWReplica::HandleValidateReply(const TransportAddress &remote,
 		ClientTableEntry &cte = clientTable[msg.clientid()];
 		ASSERT(cte.reply.clientreqid() == msg.clientreqid());
 		cte.replied = true;
-		RNotice("About to respond with validated read for client %lu, reqid %lu, view %lu",
-				msg.clientid(), cte.reply.clientreqid(), cte.reply.view());
+
+		/* THIS IS THE WRONG THING TO DO
+        ReplyMessage reply;
+		const LogEntry *entry = log.Find(lastCommitted);
+		Execute(lastCommitted, entry->request, reply);
+
+		reply.set_view(cte.reply.view());
+		reply.set_opnum(msg.clientreqid());
+		reply.set_clientreqid(msg.clientreqid());
+		*/
+
+		RDebug("Reply size: %ld", cte.reply.ByteSizeLong());
+		RDebug("Sending response for validated read for client %lu, reqid %lu, view %lu: %s",
+				msg.clientid(), cte.reply.clientreqid(), cte.reply.view(), cte.reply.DebugString().c_str());
 
 		/* Send reply */
 		auto iter = clientAddresses.find(msg.clientid());
@@ -815,7 +837,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
     viewChangeTimeout->Reset();
     
     if (msg.opnum() <= this->lastOp) {
-        RDebug("Ignoring PREPARE; already prepared that operation");
+        RDebug("Ignoring PREPARE; already prepared that operation. Resending PREPAREOK");
         // Resend the prepareOK message
         PrepareOKMessage reply;
         reply.set_view(msg.view());
@@ -858,6 +880,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
     reply.set_replicaidx(myIdx);
 	reply.set_lastcommitted(lastCommitted);
     
+	RDebug("Sending PREPAREOK");
     if (!(transport->SendMessageToReplica(this,
                                           configuration.GetLeaderIndex(view),
                                           reply))) {
@@ -936,6 +959,7 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
         cm.set_view(this->view);
         cm.set_opnum(this->lastCommitted);
 
+		RDebug("Sending COMMIT");
         if (!(transport->SendMessageToAll(this, cm))) {
             RWarning("Failed to send COMMIT message to all replicas");
         }
@@ -1154,7 +1178,7 @@ VRWReplica::HandleStartViewChange(const TransportAddress &remote,
             
             log.Dump(minCommitted,
                      dvc.mutable_entries());
-			RNotice("%d minCommitted: " FMT_OPNUM ", lastCommitted: " FMT_OPNUM, 
+			RNotice("Sending DoViewChange: %d minCommitted: " FMT_OPNUM ", lastCommitted: " FMT_OPNUM, 
 					msg.replicaidx(), minCommitted, lastCommitted);
 
             if (!(transport->SendMessageToReplica(this, leader, dvc))) {
@@ -1303,6 +1327,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         
         log.Dump(minCommitted, sv.mutable_entries());
 
+		RDebug("Sending StartView");
         if (!(transport->SendMessageToAll(this, sv))) {
             RWarning("Failed to send StartView message to all replicas");
         }
@@ -1384,6 +1409,7 @@ VRWReplica::HandleRecovery(const TransportAddress &remote,
         log.Dump(0, reply.mutable_entries());
     }
 
+	RDebug("Sending RECOVERY");
     if (!(transport->SendMessage(this, remote, reply))) {
         RWarning("Failed to send recovery response");
     }
@@ -1451,7 +1477,7 @@ VRWReplica::CleanLog()
 	/* 
 	 * Truncate the log up to the current cleanUpTo value.
 	 */
-	RNotice("Cleaning up to " FMT_OPNUM, cleanUpTo);
+	RDebug("Cleaning up to " FMT_OPNUM, cleanUpTo);
 	log.RemoveUpTo(cleanUpTo);
 }
 

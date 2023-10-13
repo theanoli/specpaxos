@@ -29,22 +29,25 @@ replicas=("localhost" "localhost" "localhost")
 # Machines on which clients are running.
 # clients=("198.0.0.1" "198.0.0.11") #"10.100.1.4")
 # clients=("10.100.1.10" "10.100.1.4")
-clients=("localhost" "localhost")
+#clients=("localhost" "localhost")
+clients=("localhost")
 
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
 
+validate_reads=$1
 nshard=1     # number of shards
-nclient=1    # number of clients to run (per machine)
+nclient=3    # number of clients to run (per machine)
 nkeys=1000 # number of keys to use
 rtime=60     # duration to run
 
-wper=10       # writes percentage
+wper=1       # writes percentage
 err=0        # error
 zalpha=0.9    # zipf alpha (-1 to disable zipf and enable uniform)
 
 # Print out configuration being used.
 echo "Configuration:"
+echo "Validate reads: $validate_reads"
 echo "Shards: $nshard"
 echo "Clients per host: $nclient"
 echo "Keys: $nkeys"
@@ -73,11 +76,15 @@ do
 done
 
 
+replica_cmd="$srcdir/kvstore/replica -m $mode"
+if "$validate_reads"; then 
+	replica_cmd="$replica_cmd -s"
+fi
 for ((i=0; i<$nshard; i++))
 do
   echo "Starting replicas for $i shards..."
   $srcdir/kvstore/tools/start_replica.sh shard$i $configdir/shard$i.config \
-    "$srcdir/kvstore/replica -m $mode -s" $logdir
+    "$replica_cmd" $logdir
 done
 
 
@@ -119,7 +126,7 @@ done
 echo "Processing logs"
 for host in ${clients[@]}
 do
-  scp $host:"$logdir/client.*.log" .
+  scp $host:"$logdir/client.*.log" $logdir
 done
 cat $logdir/client.*.log | sort -g -k 3 > $logdir/client.log
 rm -f $logdir/client.*.log

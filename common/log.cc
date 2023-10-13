@@ -56,6 +56,9 @@ Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
 	// 20230631-160456-5164 17417 * Append          (log.cc:55):        About to append entry 8290, last opnum is 8293
 	// 20230631-160456-5164 17417 PANIC Append          (log.cc:59):        Assertion `vs.opnum == LastOpnum()+1' failed
 	Debug("About to append entry " FMT_OPNUM ", last opnum is " FMT_OPNUM, vs.opnum, LastOpnum() + 1);
+	if (!(vs.opnum % 1000)) {
+		Notice("About to append entry " FMT_OPNUM ", log size pre-append: " FMT_OPNUM, vs.opnum, entries.size());
+	}
     if (entries.empty()) {
         ASSERT(vs.opnum == start);
     } else {
@@ -169,7 +172,7 @@ Log::RemoveUpTo(opnum_t op)
 	}
 
 	ASSERT(entries.empty() || entries.begin()->viewstamp.opnum == op + 1);
-	Notice("New log size after cleaning: " FMT_OPNUM, entries.size());
+	Debug("New log size after cleaning: " FMT_OPNUM, entries.size());
 }
 
 size_t
