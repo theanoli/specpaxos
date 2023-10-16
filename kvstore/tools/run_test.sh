@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ $# -ne 3 ]; then 
+    echo "Wrong number of arguments! Need three: do_read_val nclient_machines nclient_threads"
+    exit
+fi
+
 trap '{
   echo "\nKilling all clients.. Please wait..";
   for host in ${clients[@]}
@@ -22,26 +27,27 @@ logdir="$HOME/specpaxos/logs"
 keyspath="$HOME/specpaxos/kvstore/tools/keys"
 
 # Machines on which replicas are running.
-# replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")
+replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")  # 100gb
 # replicas=("10.100.1.16" "10.100.1.14" "10.100.1.13")
-replicas=("localhost" "localhost" "localhost")
+# replicas=("localhost" "localhost" "localhost")
 
 # Machines on which clients are running.
-# clients=("198.0.0.1" "198.0.0.11") #"10.100.1.4")
+clients=("198.0.0.1" "198.0.0.11")  # 100gb
 # clients=("10.100.1.10" "10.100.1.4")
 #clients=("localhost" "localhost")
-clients=("localhost")
+# clients=("localhost")
 
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
 
 validate_reads=$1
+nclients=$2  # number of client machines to use
+nclient_threads=$3    # number of clients to run (per machine)
 nshard=1     # number of shards
-nclient=3    # number of clients to run (per machine)
 nkeys=1000 # number of keys to use
-rtime=60     # duration to run
+rtime=30     # duration to run
 
-wper=1       # writes percentage
+wper=50       # writes percentage
 err=0        # error
 zalpha=0.9    # zipf alpha (-1 to disable zipf and enable uniform)
 
@@ -49,7 +55,8 @@ zalpha=0.9    # zipf alpha (-1 to disable zipf and enable uniform)
 echo "Configuration:"
 echo "Validate reads: $validate_reads"
 echo "Shards: $nshard"
-echo "Clients per host: $nclient"
+echo "Client machines: $nclient_threads"
+echo "Clients per host: $nclient_threads"
 echo "Keys: $nkeys"
 echo "Write Percentage: $wper"
 echo "Error: $err"
@@ -95,22 +102,32 @@ sleep 2
 # Run the clients
 echo "Running the client(s)"
 count=0
+client_count=0
 for host in ${clients[@]}
 do
   ssh $host "mkdir -p $srcdir/logs; $srcdir/kvstore/tools/start_client.sh \"$srcdir/kvstore/$client \
   -c $configdir/shard -N $nshard -f $srcdir/kvstore/tools/keys \
   -d $rtime -w $wper -k $nkeys -m $mode -e $err -z $zalpha\" \
-  $count $nclient $logdir"
+  $count $nclient_threads $logdir"
 
-  let count=$count+$nclient
+  let count=$count+$nclient_threads
+  client_count=$((client_count+1))
+  if [ $client_count -gt $nclients ]; then 
+	  break
+  fi
 done
 
 
 # Wait for all clients to exit
 echo "Waiting for client(s) to exit"
+client_count=0
 for host in ${clients[@]}
 do
   ssh $host "$srcdir/kvstore/tools/wait_client.sh $client"
+  client_count=$((client_count+1))
+  if [ $client_count -gt $nclients ]; then
+	  break
+  fi
 done
 
 
@@ -124,9 +141,14 @@ done
 
 # Process logs
 echo "Processing logs"
+client_count=0
 for host in ${clients[@]}
 do
   scp $host:"$logdir/client.*.log" $logdir
+  client_count=$((client_count+1))
+  if [ $client_count -gt $nclients ]; then
+	  break
+  fi
 done
 cat $logdir/client.*.log | sort -g -k 3 > $logdir/client.log
 rm -f $logdir/client.*.log
