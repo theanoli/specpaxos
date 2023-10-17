@@ -20,6 +20,13 @@ trap '{
   done
 }' INT
 
+failure() {
+	local lineno=$1
+	local msg=$2
+	echo "Failed at line $lineno: $msg"
+}
+trap 'failure ${LINENO} "$BASH_COMMAND"' ERR
+
 # Paths to source code and logfiles.
 srcdir="$HOME/specpaxos"
 configdir="$srcdir/kvstore/configs/100gb_cluster"
@@ -43,6 +50,7 @@ mode="vrw"            # Mode for replicas.
 validate_reads=$1
 nclients=$2  # number of client machines to use
 nclient_threads=$3    # number of clients to run (per machine)
+nclient_procs=$((nclients * nclient_threads))
 nshard=1     # number of shards
 nkeys=1000 # number of keys to use
 rtime=30     # duration to run
@@ -57,6 +65,7 @@ echo "Validate reads: $validate_reads"
 echo "Shards: $nshard"
 echo "Client machines: $nclients"
 echo "Clients per host: $nclient_threads"
+echo "Total client processes: $nclient_procs"
 echo "Keys: $nkeys"
 echo "Write Percentage: $wper"
 echo "Error: $err"
@@ -146,13 +155,24 @@ for host in ${clients[@]}
 do
   echo "Getting log from client $host..."
   scp $host:"$logdir/client.*.log" $logdir
-  ssh $host "rm $logdir/client.*.log"
   client_count=$((client_count+1))
   if [ $client_count -gt $nclients ]; then
 	  break
   fi
 done
 cat $logdir/client.*.log | sort -g -k 3 > $logdir/client.log
+
+# Clean up logs on client and local to avoid surprises
+client_count=1
+for host in ${clients[@]}
+do
+  echo "Cleaning up log on client $host..."
+  ssh $host "rm $logdir/client.*.log"
+  client_count=$((client_count+1))
+  if [ $client_count -gt $nclients ]; then
+	  break
+  fi
+done
 rm -f $logdir/client.*.log
 
 python3 $srcdir/kvstore/tools/process_logs.py $logdir/client.log $rtime
