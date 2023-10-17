@@ -955,6 +955,7 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
          * This can be done asynchronously, so it really ought to be
          * piggybacked on the next PREPARE or something.
          */
+	/*
         CommitMessage cm;
         cm.set_view(this->view);
         cm.set_opnum(this->lastCommitted);
@@ -965,6 +966,7 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
         }
 
         nullCommitTimeout->Reset();
+	*/
 
         // XXX Adaptive batching -- make this configurable
         if (lastBatchEnd == msg.opnum()) {
