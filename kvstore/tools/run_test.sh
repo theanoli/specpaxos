@@ -22,7 +22,7 @@ trap '{
 
 # Paths to source code and logfiles.
 srcdir="$HOME/specpaxos"
-configdir="$srcdir/kvstore/configs/local"
+configdir="$srcdir/kvstore/configs/100gb_cluster"
 logdir="$HOME/specpaxos/logs"
 keyspath="$HOME/specpaxos/kvstore/tools/keys"
 
@@ -55,7 +55,7 @@ zalpha=0.9    # zipf alpha (-1 to disable zipf and enable uniform)
 echo "Configuration:"
 echo "Validate reads: $validate_reads"
 echo "Shards: $nshard"
-echo "Client machines: $nclient_threads"
+echo "Client machines: $nclients"
 echo "Clients per host: $nclient_threads"
 echo "Keys: $nkeys"
 echo "Write Percentage: $wper"
@@ -102,7 +102,7 @@ sleep 2
 # Run the clients
 echo "Running the client(s)"
 count=0
-client_count=0
+client_count=1
 for host in ${clients[@]}
 do
   ssh $host "mkdir -p $srcdir/logs; $srcdir/kvstore/tools/start_client.sh \"$srcdir/kvstore/$client \
@@ -120,7 +120,7 @@ done
 
 # Wait for all clients to exit
 echo "Waiting for client(s) to exit"
-client_count=0
+client_count=1
 for host in ${clients[@]}
 do
   ssh $host "$srcdir/kvstore/tools/wait_client.sh $client"
@@ -141,10 +141,12 @@ done
 
 # Process logs
 echo "Processing logs"
-client_count=0
+client_count=1
 for host in ${clients[@]}
 do
+  echo "Getting log from client $host..."
   scp $host:"$logdir/client.*.log" $logdir
+  ssh $host "rm $logdir/client.*.log"
   client_count=$((client_count+1))
   if [ $client_count -gt $nclients ]; then
 	  break
