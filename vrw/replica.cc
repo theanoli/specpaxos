@@ -209,13 +209,15 @@ VRWReplica::CommitUpTo(opnum_t upto)
 			// at the client, and there's no need to record the
 			// result.
 		}
-		RDebug("Reply size: %ld", reply.ByteSizeLong());
-		RDebug("Sending reply: Client table entry's last reqID for the client %lu: " FMT_OPNUM ", %s", entry->request.clientid(), cte.lastReqId, reply.DebugString().c_str());
-		
-		/* Send reply */
-		auto iter = clientAddresses.find(entry->request.clientid());
-		if (iter != clientAddresses.end()) {
-			transport->SendMessage(this, *iter->second, reply);
+		if (AmLeader()) {
+			RDebug("Reply size: %ld", reply.ByteSizeLong());
+			RDebug("Sending reply: Client table entry's last reqID for the client %lu: " FMT_OPNUM ", %s", entry->request.clientid(), cte.lastReqId, reply.DebugString().c_str());
+			
+			/* Send reply */
+			auto iter = clientAddresses.find(entry->request.clientid());
+			if (iter != clientAddresses.end()) {
+				transport->SendMessage(this, *iter->second, reply);
+			}
 		}
 
         Latency_End(&executeAndReplyLatency);
@@ -413,6 +415,7 @@ VRWReplica::CloseBatch()
     p.set_opnum(lastOp);
     p.set_batchstart(batchStart);
 	p.set_cleanupto(GetLowestReplicaCommit()); 
+	p.set_lastCommitted(lastCommitted); 
 	
     for (opnum_t i = batchStart; i <= lastOp; i++) {
         Request *r = p.add_request();
@@ -886,6 +889,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
                                           reply))) {
         RWarning("Failed to send PrepareOK message to leader");
     }
+	CommitUpTo(msg.lastCommitted);
 }
 
 void

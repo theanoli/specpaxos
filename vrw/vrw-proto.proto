@@ -41,6 +41,7 @@ message PrepareMessage {
     required uint64 batchstart = 3;
     repeated Request request = 4;
 	required uint64 cleanUpTo = 5;
+	required uint64 lastCommitted = 6;
 }
 
 message PrepareOKMessage {
