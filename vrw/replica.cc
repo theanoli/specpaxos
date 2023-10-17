@@ -1477,6 +1477,7 @@ VRWReplica::CleanLog()
 	/* 
 	 * Truncate the log up to the current cleanUpTo value.
 	 */
+	return;
 	RDebug("Cleaning up to " FMT_OPNUM, cleanUpTo);
 	log.RemoveUpTo(cleanUpTo);
 }

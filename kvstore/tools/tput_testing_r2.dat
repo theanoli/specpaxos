@@ -3815,3 +3815,6 @@ taskset -c 29 /home/thst//specpaxos/kvstore/benchClient -c /home/thst//specpaxos
 taskset -c 30 /home/thst//specpaxos/kvstore/benchClient -c /home/thst//specpaxos/kvstore/configs/100gb_cluster/shard -N 1 -f /home/thst//specpaxos/kvstore/tools/keys -d 30 -w 50 -k 1000 -m vrw -e 0 -z 0.9 -p > /home/thst//specpaxos/logs/client.510.log 2>&1 &
 taskset -c 31 /home/thst//specpaxos/kvstore/benchClient -c /home/thst//specpaxos/kvstore/configs/100gb_cluster/shard -N 1 -f /home/thst//specpaxos/kvstore/tools/keys -d 30 -w 50 -k 1000 -m vrw -e 0 -z 0.9 -p > /home/thst//specpaxos/logs/client.511.log 2>&1 &
 Waiting for client(s) to exit
+Cleaning up
+Processing logs
+Getting log from client 198.0.0.1...
