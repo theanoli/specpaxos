@@ -1,3 +1,4 @@
+import re
 import sys
 
 start, end = -1.0, -1.0
@@ -20,7 +21,7 @@ for line in open(sys.argv[1]):
     continue
 
   line = line.strip().split()
-  if not line[0].isdigit() or len(line) < 4:
+  if not line[0].isdigit() or len(line) < 4 or re.search("[a-zA-Z]", "".join(line)):
     continue
 
   if start == -1:

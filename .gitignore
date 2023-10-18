@@ -3,3 +3,5 @@
 config
 tags
 *-test
+**/keys
+logs/
