@@ -282,10 +282,10 @@ static size_t get_log_entry_padding(size_t buf_size) {
 
 template <class T> std::vector<char>
 SerializeRepeatedLogEntries(T log_entries) {
-    Notice("Serializing repeated log entries");
+//    Notice("Serializing repeated log entries");
     std::vector<char> serialized_log_entries;
     for (auto log_entry : log_entries) {
-        Notice("Serializing entry %s", log_entry.ShortDebugString().c_str());
+//        Notice("Serializing entry %s", log_entry.ShortDebugString().c_str());
         // how big does our buffer need to be?
         size_t buf_size = get_beehive_wire_size(log_entry);
         size_t full_size = buf_size + 8;

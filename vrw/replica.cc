@@ -964,6 +964,7 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
         CommitMessage cm;
         cm.set_view(this->view);
         cm.set_opnum(this->lastCommitted);
+        RDebug("Sending commit %s", cm.ShortDebugString().c_str());
 
 		RDebug("Sending COMMIT");
         if (!(transport->SendMessageToAll(this, cm))) {
