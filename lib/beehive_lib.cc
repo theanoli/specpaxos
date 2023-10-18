@@ -38,7 +38,7 @@ static void hexdump_buf(const char *buf, size_t len) {
         snprintf(as_hex, 3, "%02x", buf[i]);
         buf_string << as_hex;
     }
-    Notice("%s", buf_string.str().c_str());
+    Debug("%s", buf_string.str().c_str());
 
 //    for (size_t i = 0; i < len; i++) {
 //        Notice("%02x", buf[i]);
@@ -308,12 +308,12 @@ SerializeRepeatedLogEntries(T log_entries) {
 
 template <class T> void
 DeserializeRepeatedLogEntries(const std::string &serialized_entries, T log_entries_out) {
-    Notice("Deserializing repeated log entries");
+    //Notice("Deserializing repeated log entries");
     const char* log_entries_buf = serialized_entries.c_str();
     size_t entries_vec_offset;
 
     while (entries_vec_offset < serialized_entries.size()) {
-        Notice("offset is %lu", entries_vec_offset);
+        //Notice("offset is %lu", entries_vec_offset);
         // figure out how long the entry is
         uint64_t entry_len = read_u64_be(log_entries_buf + entries_vec_offset);
         // serialize the entry back 
@@ -323,7 +323,7 @@ DeserializeRepeatedLogEntries(const std::string &serialized_entries, T log_entri
         // calculate padding and update the offset
         size_t padding = get_log_entry_padding(entry_len);
         entries_vec_offset += entry_len + padding;
-        Notice("Deserialized entry is %s", elem->ShortDebugString().c_str());
+        //Notice("Deserialized entry is %s", elem->ShortDebugString().c_str());
     }
 }
 

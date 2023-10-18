@@ -142,11 +142,7 @@ Log::RemoveAfter(opnum_t op)
         return;
     }
 
-<<<<<<< HEAD
-    //Notice("Removing log entries after " FMT_OPNUM, op);
-=======
     Debug("Removing log entries after " FMT_OPNUM, op);
->>>>>>> theano/stealth-reads
 
     ASSERT(op - start < entries.size());
     entries.resize(op-start);
@@ -164,11 +160,7 @@ Log::RemoveUpTo(opnum_t op)
 
 	ASSERT(op >= start);
 
-<<<<<<< HEAD
-    //Notice("Removing log entries up to " FMT_OPNUM "; start is " FMT_OPNUM, op, start);
-=======
     Debug("Removing log entries up to " FMT_OPNUM "; start is " FMT_OPNUM, op, start);
->>>>>>> theano/stealth-reads
 	ASSERT(entries.begin()->viewstamp.opnum == start);
 	while (start <= op) {
 		// Shouldn't erase uncommitted entries---everyone should have committed
@@ -180,11 +172,7 @@ Log::RemoveUpTo(opnum_t op)
 	}
 
 	ASSERT(entries.empty() || entries.begin()->viewstamp.opnum == op + 1);
-<<<<<<< HEAD
-	//Notice("New log size: " FMT_OPNUM, entries.size());
-=======
 	Debug("New log size after cleaning: " FMT_OPNUM, entries.size());
->>>>>>> theano/stealth-reads
 }
 
 size_t
