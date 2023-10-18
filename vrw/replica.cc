@@ -1134,7 +1134,7 @@ VRWReplica::HandleStateTransfer(const TransportAddress &remote,
         HandlePrepare(*msgpair.first, msgpair.second);
         delete msgpair.first;
     }
-    RNotice("STATETRANSFER completed; new lastCommitted: " FMT_VIEWSTAMP, lastCommitted);
+    RNotice("STATETRANSFER completed; new lastCommitted: " FMT_OPNUM, lastCommitted);
 }
 
 void
