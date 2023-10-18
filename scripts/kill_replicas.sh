@@ -27,7 +27,7 @@ controlReplicas() {
         else
             #cpu_index_ip_map["${REPLICA_INDEX}"]="${HOST_IP}"
 	    #set +e
-	    ssh -n ${HOST_IP} "killall replica"
+	    ssh -n ${HOST_IP} "cat ~/specpaxos/scripts/passwd | sudo -S killall replica"
 	    #set -e
 	    echo "killed ${HOST_IP}"
         fi

@@ -9,7 +9,7 @@ outfile=latencies
 
 if [ "$#" -ne "6" ]; then
 	echo "not $#"
-	echo "Usage: ./run_wrapper.sh [config_path] [version_no] [num_threads] [num_reqs] [payload_size] [warmup_period]"
+	echo "Usage: ./run_wrapper.sh [config_path] [version_no] [num_threads] [runtime] [payload_size] [warmup_period]"
 	exit 2
 fi
 
@@ -21,20 +21,20 @@ fi
 CONFIG=${1}
 VERSION_NO=${2}
 NUM_THREADS=${3}
-NUM_REQS=${4}
+RUNTIME=${4}
 PAYLOAD_SIZE=${5}
 WARMUP_PERIOD=${6}
 
 logdir="logs,${CONFIG},${VERSION_NO}/"
 mkdir -p "$logdir"
 
-destfile="$NUM_THREADS,$NUM_REQS,$PAYLOAD_SIZE,$WARMUP_PERIOD" # ,threadID,runNum,.raw
+destfile="$NUM_THREADS,$RUNTIME,$PAYLOAD_SIZE,$WARMUP_PERIOD" # ,threadID,runNum,.raw
 
 runNum=0
 while true ; do
 	if [ -e "$logdir/$destfile,0,$runNum,.raw" ]; then
 		echo "Run num $runNum exists, skipping to +1"
-		exit 4
+		#exit 0
 		runNum=$((runNum+1))
 	else
 		break
@@ -56,9 +56,11 @@ set +e
 # launch replicas
 ./spawn_replicas.sh "$CONFIG" >> "$logdir/$destfile,$tn,$runNum,.stdout" 2>> "$logdir/$destfile,$tn,$runNum,.stderr"
 
+sleep 3
+
 # do the run
 echo "*** *** STARTING RUNNING"
-./run_simple_clients.sh "$CONFIG" $NUM_THREADS $NUM_REQS $outfile $PAYLOAD_SIZE $WARMUP_PERIOD  >> "$logdir/$destfile,$tn,$runNum,.stdout" 2>> "$logdir/$destfile,$tn,$runNum,.stderr"
+./run_simple_clients.sh "$CONFIG" $NUM_THREADS $RUNTIME $outfile $PAYLOAD_SIZE $WARMUP_PERIOD  >> "$logdir/$destfile,$tn,$runNum,.stdout" 2>> "$logdir/$destfile,$tn,$runNum,.stderr"
 echo "*** *** FINISHED RUNNING"
 
 # copy over the output files to somewhere
