@@ -451,7 +451,7 @@ VRWWitness::HandlePrepare(const TransportAddress &remote,
                                           reply))) {
         RWarning("Failed to send PrepareOK message to leader");
     }
-	CommitUpTo(msg.lastCommitted);
+	CommitUpTo(msg.lastcommitted());
 }
 
 void

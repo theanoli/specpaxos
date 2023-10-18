@@ -415,7 +415,7 @@ VRWReplica::CloseBatch()
     p.set_opnum(lastOp);
     p.set_batchstart(batchStart);
 	p.set_cleanupto(GetLowestReplicaCommit()); 
-	p.set_lastCommitted(lastCommitted); 
+	p.set_lastcommitted(lastCommitted); 
 	
     for (opnum_t i = batchStart; i <= lastOp; i++) {
         Request *r = p.add_request();
@@ -889,7 +889,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
                                           reply))) {
         RWarning("Failed to send PrepareOK message to leader");
     }
-	CommitUpTo(msg.lastCommitted);
+	CommitUpTo(msg.lastcommitted());
 }
 
 void
