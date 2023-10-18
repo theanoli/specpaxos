@@ -291,10 +291,9 @@ VRWReplica::RequestStateTransfer()
     this->lastRequestStateTransferView = view;
     this->lastRequestStateTransferOpnum = lastCommitted;
 
-
-	if (!(transport->SendMessageToReplica(this, 
-					configuration.GetLeaderIndex(view), m))) {
-    // if (!transport->SendMessageToAll(this, m)) {
+	// if (!(transport->SendMessageToReplica(this, 
+	// 				configuration.GetLeaderIndex(view), m))) {
+    if (!transport->SendMessageToAll(this, m)) {
         RWarning("Failed to send RequestStateTransfer message to all replicas");
     }
 }
@@ -861,7 +860,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
     if (msg.batchstart() > this->lastOp+1) {
 		RNotice("Requesting state transfer in HandlePrepare");
         RequestStateTransfer();
-        pendingPrepares.push_back(std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
+        // pendingPrepares.push_back(std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
         return;
     }
     
@@ -1130,7 +1129,7 @@ VRWReplica::HandleStateTransfer(const TransportAddress &remote,
     std::list<std::pair<TransportAddress *, PrepareMessage> >pending = pendingPrepares;
     pendingPrepares.clear();
     for (auto & msgpair : pendingPrepares) {
-        RDebug("Processing pending prepare message");
+        RNotice("Processing pending prepare message");
         HandlePrepare(*msgpair.first, msgpair.second);
         delete msgpair.first;
     }

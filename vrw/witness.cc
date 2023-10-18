@@ -215,9 +215,9 @@ VRWWitness::RequestStateTransfer()
     this->lastRequestStateTransferView = view;
     this->lastRequestStateTransferOpnum = lastCommitted;
 
-	if (!(transport->SendMessageToReplica(this, 
-					configuration.GetLeaderIndex(view), m))) {
-    // if (!transport->SendMessageToAll(this, m)) {
+	// if (!(transport->SendMessageToReplica(this, 
+	// 				configuration.GetLeaderIndex(view), m))) {
+    if (!transport->SendMessageToAll(this, m)) {
         RWarning("Failed to send RequestStateTransfer message to all replicas");
     }
 }
@@ -383,7 +383,7 @@ VRWWitness::HandlePrepare(const TransportAddress &remote,
 
     if (msg.view() > this->view) {
         RequestStateTransfer();
-        pendingPrepares.push_back(std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
+        // pendingPrepares.push_back(std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
         return;
     }
 
