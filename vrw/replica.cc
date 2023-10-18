@@ -274,10 +274,6 @@ VRWReplica::SendRecoveryMessages()
 void
 VRWReplica::RequestStateTransfer()
 {
-    RequestStateTransferMessage m;
-    m.set_view(view);
-    m.set_opnum(lastCommitted);
-
     if ((lastRequestStateTransferOpnum != 0) &&
         (lastRequestStateTransferView == view) &&
         (lastRequestStateTransferOpnum == lastCommitted)) {
@@ -285,13 +281,20 @@ VRWReplica::RequestStateTransfer()
                " because we already requested it", view, lastCommitted);
         return;
     }
-    
+
+    RequestStateTransferMessage m;
+    m.set_view(view);
+    m.set_opnum(lastCommitted);
+
     RNotice("Requesting state transfer: " FMT_VIEWSTAMP, view, lastCommitted);
 
     this->lastRequestStateTransferView = view;
     this->lastRequestStateTransferOpnum = lastCommitted;
 
-    if (!transport->SendMessageToAll(this, m)) {
+
+	if (!(transport->SendMessageToReplica(this, 
+					configuration.GetLeaderIndex(view), m))) {
+    // if (!transport->SendMessageToAll(this, m)) {
         RWarning("Failed to send RequestStateTransfer message to all replicas");
     }
 }
@@ -1058,7 +1061,7 @@ void
 VRWReplica::HandleStateTransfer(const TransportAddress &remote,
                                const StateTransferMessage &msg)
 {
-    RDebug("Received STATETRANSFER " FMT_VIEWSTAMP, msg.view(), msg.opnum());
+    RNotice("Received STATETRANSFER " FMT_VIEWSTAMP, msg.view(), msg.opnum());
     
     if (msg.view() < view) {
         RWarning("Ignoring state transfer for older view");

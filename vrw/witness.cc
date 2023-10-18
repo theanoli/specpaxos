@@ -215,7 +215,9 @@ VRWWitness::RequestStateTransfer()
     this->lastRequestStateTransferView = view;
     this->lastRequestStateTransferOpnum = lastCommitted;
 
-    if (!transport->SendMessageToAll(this, m)) {
+	if (!(transport->SendMessageToReplica(this, 
+					configuration.GetLeaderIndex(view), m))) {
+    // if (!transport->SendMessageToAll(this, m)) {
         RWarning("Failed to send RequestStateTransfer message to all replicas");
     }
 }
