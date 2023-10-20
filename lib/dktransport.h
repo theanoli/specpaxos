@@ -36,7 +36,7 @@
 #include "lib/configuration.h"
 #include "lib/transport.h"
 #include "lib/transportcommon.h"
-#include "demikernel/libos.h"
+#include "demi/libos.h"
 #include "lib/latency.h"
 #include <event2/event.h>
 
@@ -71,10 +71,10 @@ class DkTransport : public TransportCommon<DkTransportAddress>
 {
 public:
     DkTransport(double dropRate = 0.0, double reogrderRate = 0.0,
-                    int dscp = 0, bool handleSignals = true);
+                    int dscp = 0, event_base *evbase = nullptr);
     virtual ~DkTransport();
     void Register(TransportReceiver *receiver,
-                  const transport::Configuration &config,
+                  const specpaxos::Configuration &config,
                   int replicaIdx);
     void Run();
     void Stop();
@@ -83,22 +83,25 @@ public:
     void CancelAllTimers();
 
 private:
-    int timerQD;
     int acceptQD;
     int replicaIdx;
     TransportReceiver *receiver;
      
     struct DkTransportTimerInfo
     {
+        DkTransport *transport;
         timer_callback_t cb;
+        event *ev;
         int id;
     };
+
+    event_base *libeventBase;
+    std::map<int, DkTransportTimerInfo *> timers;
 
     std::map<int, TransportReceiver*> receivers; // qd -> receiver
     //std::map<TransportReceiver*, int> qds; // receiver -> qd
     int lastTimerId;
     std::vector<demi_qtoken_t> tokens;
-    std::map<int, DkTransportTimerInfo *> timers;
     std::map<DkTransportAddress, int> dkOutgoing;
     std::map<int, DkTransportAddress> dkIncoming;
 
@@ -107,16 +110,16 @@ private:
                              const Message &m, bool multicast = false);
 
     DkTransportAddress
-    LookupAddress(const transport::ReplicaAddress &addr);
+    LookupAddress(const specpaxos::ReplicaAddress &addr);
     DkTransportAddress
-    LookupAddress(const transport::Configuration &cfg,
+    LookupAddress(const specpaxos::Configuration &cfg,
                   int replicaIdx);
     const DkTransportAddress *
-    LookupMulticastAddress(const transport::Configuration*config) { return NULL; };
+    LookupMulticastAddress(const specpaxos::Configuration*config) { return NULL; };
 
     void ConnectDk(TransportReceiver *src, const DkTransportAddress &dst);
     void OnTimer(DkTransportTimerInfo *info);
-    void TimerCallback(DkTransportTimerInfo *info);
+    static void TimerCallback(evutil_socket_t fd, short what, void *arg);
     void DkAcceptCallback(demi_accept_result ares);
     void DkPopCallback(int qd, TransportReceiver *receiver, demi_sgarray_t &sga);
     void CloseConn(int qd);

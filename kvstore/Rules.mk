@@ -9,11 +9,11 @@ PROTOS += $(addprefix $(d), \
 OBJS-kv-store := $(o)server.o $(o)kvstore.o
 
 OBJS-kv-client := $(o)request.o $(o)client.o \
-  $(OBJS-spec-client) $(OBJS-vrw-client) $(OBJS-vr-client) $(OBJS-fastpaxos-client) $(LIB-udptransport)
+  $(OBJS-spec-client) $(OBJS-vrw-client) $(OBJS-vr-client) $(OBJS-fastpaxos-client) $(LIB-dktransport) $(LIB-udptransport)
 
 $(d)benchClient: $(OBJS-kv-client) $(o)benchClient.o
 
 $(d)replica: $(o)request.o $(OBJS-kv-store) \
-	$(OBJS-spec-replica) $(OBJS-vrw-replica) $(OBJS-vrw-witness) $(OBJS-vr-replica) $(OBJS-fastpaxos-replica) $(LIB-udptransport)
+	$(OBJS-spec-replica) $(OBJS-vrw-replica) $(OBJS-vrw-witness) $(OBJS-vr-replica) $(OBJS-fastpaxos-replica) $(LIB-dktransport) $(LIB-udptransport)
 
 BINS += $(d)benchClient $(d)replica

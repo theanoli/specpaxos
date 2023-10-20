@@ -168,7 +168,7 @@ main(int argc, char **argv)
         Usage(argv[0]);
     }
 
-    UDPTransport transport(0.0, 0.0, 0);
+    DkTransport transport(0.0, 0.0, 0);
 
     specpaxos::Replica *replica;
     kvstore::Server server;

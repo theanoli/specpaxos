@@ -34,10 +34,11 @@
 #include "lib/configuration.h"
 #include "lib/message.h"
 #include "lib/dktransport.h"
-#include "demikernel/wait.h"
+#include "demi/wait.h"
 #include "lib/latency.h"
 
 #include <google/protobuf/message.h>
+#include <event2/event.h>
 #include <event2/thread.h>
 
 #include <netinet/tcp.h>
@@ -105,7 +106,7 @@ bool operator<(const DkTransportAddress &a, const DkTransportAddress &b)
 }
 
 DkTransportAddress
-DkTransport::LookupAddress(const transport::ReplicaAddress &addr)
+DkTransport::LookupAddress(const specpaxos::ReplicaAddress &addr)
 {
         int res;
         struct addrinfo hints;
@@ -131,10 +132,10 @@ DkTransport::LookupAddress(const transport::ReplicaAddress &addr)
 }
 
 DkTransportAddress
-DkTransport::LookupAddress(const transport::Configuration &config,
+DkTransport::LookupAddress(const specpaxos::Configuration &config,
                             int idx)
 {
-    const transport::ReplicaAddress &addr = config.replica(idx);
+    const specpaxos::ReplicaAddress &addr = config.replica(idx);
     return LookupAddress(addr);
 }
 
@@ -172,36 +173,42 @@ BindToPort(int qd, const string &host, const string &port)
     }
 }
 
+// TODO This interface needs to be fixed in .h
+// evbase should be NULL when called
 DkTransport::DkTransport(double dropRate, double reorderRate,
-			   int dscp, bool handleSignals)
+			   int dscp, event_base *evbase)
 {
     char *argv[] = {};
     demi_init(0, argv);
 
     lastTimerId = 0;
+    
+    /*
     demi_queue(&timerQD);
     ASSERT(timerQD != 0);
+    */
+    evthread_use_pthreads();
+    libeventBase = event_base_new();
+    evthread_make_base_notifiable(libeventBase);
 
     // Set up signal handler
-    if (handleSignals) {
-        struct sigaction sa;
-        memset(&sa, 0, sizeof(sa));
-        // Setup the sighub handler
-        sa.sa_handler = &DkSignalCallback;
-        // Restart the system call, if at all possible
-        sa.sa_flags = SA_RESTART;
-
-        // Block every signal during the handler
-        sigfillset(&sa.sa_mask);
-
-        // Intercept SIGHUP and SIGINT
-        if (sigaction(SIGTERM, &sa, NULL) == -1) {
-            Panic("Cannot handle SIGTERM");
-        }
-
-        if (sigaction(SIGINT, &sa, NULL) == -1) {
-            Panic("Error: cannot handle SIGINT"); // Should not happen
-        }
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    // Setup the sighub handler
+    sa.sa_handler = &DkSignalCallback;
+    // Restart the system call, if at all possible
+    sa.sa_flags = SA_RESTART;
+    
+    // Block every signal during the handler
+    sigfillset(&sa.sa_mask);
+    
+    // Intercept SIGHUP and SIGINT
+    if (sigaction(SIGTERM, &sa, NULL) == -1) {
+        Panic("Cannot handle SIGTERM");
+    }
+    
+    if (sigaction(SIGINT, &sa, NULL) == -1) {
+        Panic("Error: cannot handle SIGINT"); // Should not happen
     }
     Debug("Using Dk transport");
 }
@@ -228,10 +235,11 @@ DkTransport::ConnectDk(TransportReceiver *src, const DkTransportAddress &dst)
     //this->receiver = src;
     int res;
     demi_qtoken_t t;
+    demi_qresult_t wait_out;
     if ((res = demi_connect(&t, qd,
 			    (struct sockaddr *)&(dst.addr),
 			    sizeof(dst.addr))) != 0 ||
-        (res = demi_wait(NULL, t)) != 0) {
+        (res = demi_wait(&wait_out, t, NULL)) != 0) {
         Panic("Failed to connect %s:%d: %s",
               inet_ntoa(dst.addr.sin_addr),
               htons(dst.addr.sin_port),
@@ -269,13 +277,13 @@ DkTransport::ConnectDk(TransportReceiver *src, const DkTransportAddress &dst)
 
 void
 DkTransport::Register(TransportReceiver *receiver,
-                       const transport::Configuration &config,
+                       const specpaxos::Configuration &config,
                        int replicaIdx)
 {
     ASSERT(replicaIdx < config.n);
     struct sockaddr_in sin;
 
-    //const transport::Configuration *canonicalConfig =
+    //const specpaxos::Configuration *canonicalConfig =
     RegisterConfiguration(receiver, config, replicaIdx);
     this->replicaIdx = replicaIdx;
     // Clients don't need to accept Dk connections
@@ -387,7 +395,9 @@ DkTransport::SendMessageInternal(TransportReceiver *src,
     demi_qtoken_t t;
     int ret = demi_push(&t, qd, &sga);
     ASSERT(ret == 0);
-    ret = demi_wait(NULL, t);
+    
+    demi_qresult_t wait_out;
+    ret = demi_wait(&wait_out, t, NULL);
     ASSERT(ret == 0);
     Latency_End(&push_msg);
 
@@ -413,21 +423,22 @@ void
 DkTransport::Run()
 {
     demi_qtoken_t token;
-    int status;
+    int status = 0;
     stopLoop = false;
-    // check timer on clients
+
     if (replicaIdx == -1) {
-        status = demi_pop(&token, timerQD);
+	// Check timer on clients; event_base_loop does single check for events 
+	event_base_loop(libeventBase);
     } else {
         // check accept on servers
         status = demi_accept(&token, acceptQD);
+	tokens.push_back(token);
     }
     if (status != 0) {
         return;
     }
-    tokens.push_back(token);
     while (!stopLoop) {
-        demi_qresult wait_out;
+        demi_qresult_t wait_out;
         int ready_idx;
         int status = demi_wait_any(&wait_out, &ready_idx, tokens.data(), tokens.size());
 
@@ -435,6 +446,7 @@ DkTransport::Run()
         if (status == 0) {
             Debug("Found something: qd=%lx",
                   wait_out.qr_qd);
+	    /*
             // check timer on clients
             if (replicaIdx == -1 && wait_out.qr_qd == timerQD) {
 		demi_sgarray_t &sga = wait_out.qr_value.sga;
@@ -442,7 +454,9 @@ DkTransport::Run()
                 OnTimer(reinterpret_cast<DkTransportTimerInfo *>(sga.sga_buf));
                 status = demi_pop(&token, timerQD);
             } else if (wait_out.qr_qd == acceptQD) {
-                // check accept on servers
+	    // */
+	    if (wait_out.qr_qd == acceptQD) {
+		// check accept on servers
                 DkAcceptCallback(wait_out.qr_value.ares);
                 // call accept again
                 status = demi_accept(&token, acceptQD);
@@ -453,12 +467,17 @@ DkTransport::Run()
                 DkPopCallback(wait_out.qr_qd, receivers[wait_out.qr_qd], sga);
 		status = demi_pop(&token, wait_out.qr_qd);
             }
+
+	    // ...otherwise check the client timer
+	    if (replicaIdx == -1) {
+	        event_base_loop(libeventBase);
+	    }
         } // else fall through, typically connection closed
 	
         if (status == 0)
             tokens[ready_idx] = token;
         else {
-            if (wait_out.qr_qd == acceptQD || wait_out.qr_qd == timerQD)
+            if (wait_out.qr_qd == acceptQD)  // || wait_out.qr_qd == timerQD)
                 break;
             //assert(status == ECONNRESET || status == ECONNABORTED);
             CloseConn(wait_out.qr_qd);
@@ -483,29 +502,25 @@ DkTransport::Stop()
 int
 DkTransport::Timer(uint64_t ms, timer_callback_t cb)
 {
-    if (ms == 0) {
-        DkTransportTimerInfo *info = new DkTransportTimerInfo();
-        ++lastTimerId;
-        
-        info->id = lastTimerId;
-        info->cb = cb;
-    
-        timers[info->id] = info;
-        
-        demi_sgarray_t sga = {};
-        sga.sga_buf = reinterpret_cast<void *>(info);
-        sga.sga_numsegs = 1;
-        sga.sga_segs[0].sgaseg_buf = reinterpret_cast<void *>(info);
-        sga.sga_segs[0].sgaseg_len = sizeof(DkTransportTimerInfo);
-        demi_qtoken_t qt;
-        int ret = demi_push(&qt, timerQD, &sga);
+    DkTransportTimerInfo *info = new DkTransportTimerInfo();
 
-        assert(ret == 0);
-        ret = demi_wait(NULL, qt);
-        assert(ret == 0);
-        return info->id;
-    }
-    return 0;
+    struct timeval tv;
+    tv.tv_sec = ms/1000;
+    tv.tv_usec = (ms % 1000) * 1000;
+    
+    ++lastTimerId;
+    
+    info->transport = this;
+    info->id = lastTimerId;
+    info->cb = cb;
+    info->ev = event_new(libeventBase, -1, 0,
+                         TimerCallback, info);
+
+    timers[info->id] = info;
+    
+    event_add(info->ev, &tv);
+    
+    return info->id;
 }
 
 bool
@@ -518,6 +533,8 @@ DkTransport::CancelTimer(int id)
     }
 
     timers.erase(info->id);
+    event_del(info->ev);
+    event_free(info->ev);
     delete info;
     
     return true;
@@ -536,7 +553,11 @@ void
 DkTransport::OnTimer(DkTransportTimerInfo *info)
 {
     timers.erase(info->id);
+    event_del(info->ev);
+    event_free(info->ev);
+    
     info->cb();
+
     delete info;
 }
 
@@ -601,4 +622,15 @@ DkTransport::DkPopCallback(int qd,
     Latency_End(&process_pop);
 
     Debug("Done processing large %s message", type.c_str());        
+}
+
+void
+DkTransport::TimerCallback(evutil_socket_t fd, short what, void *arg)
+{
+    DkTransport::DkTransportTimerInfo *info =
+        (DkTransport::DkTransportTimerInfo *)arg;
+
+    ASSERT(what & EV_TIMEOUT);
+
+    info->transport->OnTimer(info);
 }

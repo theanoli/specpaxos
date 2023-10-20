@@ -13,6 +13,7 @@
 #include "lib/assert.h"
 #include "lib/message.h"
 #include "lib/udptransport.h"
+#include "lib/dktransport.h"
 #include "common/client.h"
 #include "lib/configuration.h"
 #include "spec/client.h"
@@ -56,7 +57,7 @@ private:
     long client_id; // Unique ID for this client.
     long nshards; // Number of shards in niStore
 
-    UDPTransport transport; // Transport used by paxos client proxies.
+    DkTransport transport; // Transport used by paxos client proxies.
     thread *clientTransport; // Thread running the transport event loop.
 
     vector<specpaxos::Client *> shard; // List of shard client proxies.
