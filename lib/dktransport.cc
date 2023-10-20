@@ -250,9 +250,12 @@ DkTransport::ConnectDk(TransportReceiver *src, const DkTransportAddress &dst)
     // Tell the receiver its address
     struct sockaddr_in sin;
     socklen_t sinsize = sizeof(sin);
+	/*
+	// TODO check this
     if (demi_getsockname(qd, (sockaddr *) &sin, &sinsize) < 0) {
         PPanic("Failed to get socket name");
     }
+	*/
     DkTransportAddress *addr = new DkTransportAddress(sin);
     src->SetAddress(addr);
 
@@ -426,55 +429,59 @@ DkTransport::Run()
     int status = 0;
     stopLoop = false;
 
+	// Initial tokens to wait on; clients will not receive anything until they 
+	// send, and it will block on receive, so we need a timer event to send things
     if (replicaIdx == -1) {
-	// Check timer on clients; event_base_loop does single check for events 
-	event_base_loop(libeventBase);
+		// Check timer on clients; event_base_loop does single check for events 
+		// event_base_loop(libeventBase);
+		status = demi_pop(&token, timerQD);
     } else {
         // check accept on servers
         status = demi_accept(&token, acceptQD);
-	tokens.push_back(token);
     }
+	tokens.push_back(token);
     if (status != 0) {
         return;
     }
     while (!stopLoop) {
         demi_qresult_t wait_out;
         int ready_idx;
+
         int status = demi_wait_any(&wait_out, &ready_idx, tokens.data(), tokens.size());
 
         // if we got an EOK back from wait
         if (status == 0) {
             Debug("Found something: qd=%lx",
                   wait_out.qr_qd);
-	    /*
-            // check timer on clients
-            if (replicaIdx == -1 && wait_out.qr_qd == timerQD) {
-		demi_sgarray_t &sga = wait_out.qr_value.sga;
-                assert(sga.sga_numsegs == 1);
-                OnTimer(reinterpret_cast<DkTransportTimerInfo *>(sga.sga_buf));
-                status = demi_pop(&token, timerQD);
-            } else if (wait_out.qr_qd == acceptQD) {
-	    // */
-	    if (wait_out.qr_qd == acceptQD) {
-		// check accept on servers
-                DkAcceptCallback(wait_out.qr_value.ares);
-                // call accept again
-                status = demi_accept(&token, acceptQD);
-            } else {
-                // process request
-		demi_sgarray_t &sga = wait_out.qr_value.sga;
-                assert(sga.sga_numsegs > 0);
-                DkPopCallback(wait_out.qr_qd, receivers[wait_out.qr_qd], sga);
-		status = demi_pop(&token, wait_out.qr_qd);
-            }
+			/*
+				// check timer on clients
+				if (replicaIdx == -1 && wait_out.qr_qd == timerQD) {
+			demi_sgarray_t &sga = wait_out.qr_value.sga;
+					assert(sga.sga_numsegs == 1);
+					OnTimer(reinterpret_cast<DkTransportTimerInfo *>(sga.sga_buf));
+					status = demi_pop(&token, timerQD);
+				} else if (wait_out.qr_qd == acceptQD) {
+			// */
+			if (wait_out.qr_qd == acceptQD) {
+				// check accept on servers
+				DkAcceptCallback(wait_out.qr_value.ares);
+				// call accept again
+				status = demi_accept(&token, acceptQD);
+			} else {
+				// process request
+				demi_sgarray_t &sga = wait_out.qr_value.sga;
+				assert(sga.sga_numsegs > 0);
+				DkPopCallback(wait_out.qr_qd, receivers[wait_out.qr_qd], sga);
+				status = demi_pop(&token, wait_out.qr_qd);
+			}
 
-	    // ...otherwise check the client timer
-		// This is wrong. It will only be checked if demi_wait_any is triggered and 
-		// we apparently want to get here when the timeout elapses, which is independent
-		// of the tokens we are waiting on in demi_wait_any.
-	    if (replicaIdx == -1) {
-	        event_base_loop(libeventBase);
-	    }
+			// ...otherwise check the client timer
+			// This is wrong. It will only be checked if demi_wait_any is triggered and 
+			// we apparently want to get here when the timeout elapses, which is independent
+			// of the tokens we are waiting on in demi_wait_any.
+			// if (replicaIdx == -1) {
+			// 	event_base_loop(libeventBase);
+			// }
         } // else fall through, typically connection closed
 	
         if (status == 0)
