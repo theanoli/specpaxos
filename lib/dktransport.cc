@@ -425,43 +425,56 @@ DkTransport::CloseConn(int qd)
 void
 DkTransport::Run()
 {
+	// This should just be the libevent event loop. 
+    event_base_dispatch(libeventBase);
+}
+	
+void
+DkTransport::WaitAny()
+{
+	auto ev = event_new(libeventBase, -1, 0, Callback, params); 
+
+	// The callback should be the body of the loop below: when an event breaks us out of
+	// the wait_any loop, we should check what type of event it is and handle it. 
+	// Then add a new wait_any call to the libevent loop. 
+	// We can do this by adding a Timer(0, WaitAny) to libevent. 
+	// Possibly equivalent would be to call event_base_loop() within the "legacy" TAPIR Run()
+	// loop, i.e., if the timeout on wait_any triggers or we have an event, check whether there
+	// are any libevents waiting *once* and then reenter the wait_any. The timeout should be
+	// pretty short. Either of these options is definitely worse than waiting within the same
+	// wait_any for the timeout OR IO event, but without implementing the generic queue in 
+	// demikernel this seems impossible. 
+
     demi_qtoken_t token;
     int status = 0;
     stopLoop = false;
 
 	// Initial tokens to wait on; clients will not receive anything until they 
 	// send, and it will block on receive, so we need a timer event to send things
-    if (replicaIdx == -1) {
-		// Check timer on clients; event_base_loop does single check for events 
-		// event_base_loop(libeventBase);
-		status = demi_pop(&token, timerQD);
-    } else {
+    if (replicaIdx >= 0) {
         // check accept on servers
         status = demi_accept(&token, acceptQD);
+		tokens.push_back(token);
     }
-	tokens.push_back(token);
     if (status != 0) {
         return;
     }
+
+	struct timespec ts; 
+	ts.tv_sec = 0; 
+	ts.tv_nsec = 100000;  // 100us; TODO set this properly
+
     while (!stopLoop) {
         demi_qresult_t wait_out;
         int ready_idx;
+		int status; 
 
-        int status = demi_wait_any(&wait_out, &ready_idx, tokens.data(), tokens.size());
+		status = demi_wait_any(&wait_out, &ready_idx, tokens.data(), tokens.size(), ts);
 
         // if we got an EOK back from wait
         if (status == 0) {
             Debug("Found something: qd=%lx",
                   wait_out.qr_qd);
-			/*
-				// check timer on clients
-				if (replicaIdx == -1 && wait_out.qr_qd == timerQD) {
-			demi_sgarray_t &sga = wait_out.qr_value.sga;
-					assert(sga.sga_numsegs == 1);
-					OnTimer(reinterpret_cast<DkTransportTimerInfo *>(sga.sga_buf));
-					status = demi_pop(&token, timerQD);
-				} else if (wait_out.qr_qd == acceptQD) {
-			// */
 			if (wait_out.qr_qd == acceptQD) {
 				// check accept on servers
 				DkAcceptCallback(wait_out.qr_value.ares);
@@ -474,21 +487,16 @@ DkTransport::Run()
 				DkPopCallback(wait_out.qr_qd, receivers[wait_out.qr_qd], sga);
 				status = demi_pop(&token, wait_out.qr_qd);
 			}
-
-			// ...otherwise check the client timer
-			// This is wrong. It will only be checked if demi_wait_any is triggered and 
-			// we apparently want to get here when the timeout elapses, which is independent
-			// of the tokens we are waiting on in demi_wait_any.
-			// if (replicaIdx == -1) {
-			// 	event_base_loop(libeventBase);
-			// }
-        } // else fall through, typically connection closed
+        } // else fall through; either timeout or connection closed
 	
-        if (status == 0)
+        if (status == 0) {
             tokens[ready_idx] = token;
-        else {
-            if (wait_out.qr_qd == acceptQD)  // || wait_out.qr_qd == timerQD)
+		} else if (status == ETIMEDOUT) {
+			continue;
+		} else {
+            if (wait_out.qr_qd == acceptQD) {
                 break;
+			}
             //assert(status == ECONNRESET || status == ECONNABORTED);
             CloseConn(wait_out.qr_qd);
             tokens.erase(tokens.begin()+ready_idx);
