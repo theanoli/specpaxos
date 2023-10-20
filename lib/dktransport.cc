@@ -469,6 +469,9 @@ DkTransport::Run()
             }
 
 	    // ...otherwise check the client timer
+		// This is wrong. It will only be checked if demi_wait_any is triggered and 
+		// we apparently want to get here when the timeout elapses, which is independent
+		// of the tokens we are waiting on in demi_wait_any.
 	    if (replicaIdx == -1) {
 	        event_base_loop(libeventBase);
 	    }
