@@ -452,7 +452,7 @@ DkTransport::Run()
         int ready_idx;
 		int status; 
 
-		status = demi_wait_any(&wait_out, &ready_idx, tokens.data(), tokens.size(), ts);
+		status = demi_wait_any(&wait_out, &ready_idx, tokens.data(), tokens.size(), &ts);
 
         // if we got an EOK back from wait
         if (status == 0) {
@@ -475,7 +475,7 @@ DkTransport::Run()
         if (status == 0) {
             tokens[ready_idx] = token;
 		} else if (status == ETIMEDOUT) {
-			event_base_loop();
+			event_base_loop(libeventBase, 0);
 		} else {
             if (wait_out.qr_qd == acceptQD) {
                 break;
