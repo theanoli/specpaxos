@@ -173,8 +173,6 @@ BindToPort(int qd, const string &host, const string &port)
     }
 }
 
-// TODO This interface needs to be fixed in .h
-// evbase should be NULL when called
 DkTransport::DkTransport(double dropRate, double reorderRate,
 			   int dscp, event_base *evbase)
 {
@@ -183,10 +181,6 @@ DkTransport::DkTransport(double dropRate, double reorderRate,
 
     lastTimerId = 0;
     
-    /*
-    demi_queue(&timerQD);
-    ASSERT(timerQD != 0);
-    */
     evthread_use_pthreads();
     libeventBase = event_base_new();
     evthread_make_base_notifiable(libeventBase);
@@ -425,15 +419,6 @@ DkTransport::CloseConn(int qd)
 void
 DkTransport::Run()
 {
-	// This should just be the libevent event loop. 
-    event_base_dispatch(libeventBase);
-}
-	
-void
-DkTransport::WaitAny()
-{
-	auto ev = event_new(libeventBase, -1, 0, Callback, params); 
-
 	// The callback should be the body of the loop below: when an event breaks us out of
 	// the wait_any loop, we should check what type of event it is and handle it. 
 	// Then add a new wait_any call to the libevent loop. 
@@ -449,8 +434,6 @@ DkTransport::WaitAny()
     int status = 0;
     stopLoop = false;
 
-	// Initial tokens to wait on; clients will not receive anything until they 
-	// send, and it will block on receive, so we need a timer event to send things
     if (replicaIdx >= 0) {
         // check accept on servers
         status = demi_accept(&token, acceptQD);
@@ -492,7 +475,7 @@ DkTransport::WaitAny()
         if (status == 0) {
             tokens[ready_idx] = token;
 		} else if (status == ETIMEDOUT) {
-			continue;
+			event_base_loop();
 		} else {
             if (wait_out.qr_qd == acceptQD) {
                 break;
