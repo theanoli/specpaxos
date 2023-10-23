@@ -51,7 +51,7 @@
 #include <netdb.h>
 #include <functional>
 
-const size_t MAX_Dk_SIZE = 100; // XXX
+const size_t MAX_DK_SIZE = 100; // XXX
 const uint32_t MAGIC = 0x06121983;
 static bool stopLoop = false;
 
@@ -226,10 +226,9 @@ DkTransport::ConnectDk(TransportReceiver *src, const DkTransportAddress &dst)
         PPanic("Failed to create queue for outgoing Dk connection");
     }
 
-    //this->receiver = src;
     int res;
-    demi_qtoken_t t;
-    demi_qresult_t wait_out;
+    demi_qtoken_t t = -1;
+    demi_qresult_t wait_out = {0};
     if ((res = demi_connect(&t, qd,
 			    (struct sockaddr *)&(dst.addr),
 			    sizeof(dst.addr))) != 0 ||
@@ -241,10 +240,11 @@ DkTransport::ConnectDk(TransportReceiver *src, const DkTransportAddress &dst)
         return;
     }
 
-    // Tell the receiver its address
+    // Tell the receiver its address (NOOP?)
     struct sockaddr_in sin;
-    socklen_t sinsize = sizeof(sin);
+
 	/*
+    socklen_t sinsize = sizeof(sin);
 	// TODO check this
     if (demi_getsockname(qd, (sockaddr *) &sin, &sinsize) < 0) {
         PPanic("Failed to get socket name");
@@ -269,7 +269,6 @@ DkTransport::ConnectDk(TransportReceiver *src, const DkTransportAddress &dst)
         tokens.push_back(token);
     else
         CloseConn(qd);
-
 }
 
 void
@@ -312,9 +311,11 @@ DkTransport::Register(TransportReceiver *receiver,
     // Tell the receiver its address
     socklen_t sinsize = sizeof(sin);
     
+	/*
     if (demi_getsockname(qd, (sockaddr *) &sin, &sinsize) < 0) {
         PPanic("Failed to get socket name");
     }
+	*/
     
     DkTransportAddress *addr = new DkTransportAddress(sin);
     receiver->SetAddress(addr);
