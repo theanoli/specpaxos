@@ -60,17 +60,16 @@ DkSignalCallback(int signal)
 {
     ASSERT(signal == SIGTERM || signal == SIGINT);
     Warning("Set stop loop from signal");
-    Latency_DumpAll();
     exit(0);
 }
 
 using std::make_pair;
 
-DEFINE_LATENCY(process_pop);
-DEFINE_LATENCY(process_push);
-DEFINE_LATENCY(push_msg);
-DEFINE_LATENCY(protobuf_serialize);
-DEFINE_LATENCY(run_app);
+// DEFINE_LATENCY(process_pop);
+// DEFINE_LATENCY(process_push);
+// DEFINE_LATENCY(push_msg);
+// DEFINE_LATENCY(protobuf_serialize);
+// DEFINE_LATENCY(run_app);
 
 DkTransportAddress::DkTransportAddress(const sockaddr_in &addr)
     : addr(addr)
@@ -228,7 +227,7 @@ DkTransport::ConnectDk(TransportReceiver *src, const DkTransportAddress &dst)
 
     int res;
     demi_qtoken_t t = -1;
-    demi_qresult_t wait_out = {0};
+    demi_qresult_t wait_out = {static_cast<demi_opcode>(0)};
     if ((res = demi_connect(&t, qd,
 			    (struct sockaddr *)&(dst.addr),
 			    sizeof(dst.addr))) != 0 ||
@@ -329,7 +328,6 @@ DkTransport::SendMessageInternal(TransportReceiver *src,
                                   const Message &m,
                                   bool multicast)
 {
-    Latency_Start(&process_push);
     auto it = dkOutgoing.find(dst);
     // See if we have a connection open
     if (it == dkOutgoing.end()) {
@@ -345,9 +343,7 @@ DkTransport::SendMessageInternal(TransportReceiver *src,
     int qd = it->second;
     
     // Serialize message
-    Latency_Start(&protobuf_serialize);
     string data = m.SerializeAsString();
-    Latency_End(&protobuf_serialize);
     string type = m.GetTypeName();
     size_t typeLen = type.length();
     size_t dataLen = data.length();
@@ -389,7 +385,6 @@ DkTransport::SendMessageInternal(TransportReceiver *src,
     memcpy(ptr, data.c_str(), dataLen);
     ptr += dataLen;
 
-    Latency_Start(&push_msg);
     demi_qtoken_t t;
     int ret = demi_push(&t, qd, &sga);
     ASSERT(ret == 0);
@@ -397,12 +392,10 @@ DkTransport::SendMessageInternal(TransportReceiver *src,
     demi_qresult_t wait_out;
     ret = demi_wait(&wait_out, t, NULL);
     ASSERT(ret == 0);
-    Latency_End(&push_msg);
 
     Debug("Sent %ld byte %s message to server over Dk",
           totalLen, type.c_str());
     free(buf);
-    Latency_End(&process_push);
     return true;
 }
 
@@ -487,7 +480,6 @@ DkTransport::Run()
         }
     }
     Warning("Exited loop");
-    Latency_DumpAll();
 }
 
 void
@@ -593,7 +585,6 @@ DkTransport::DkPopCallback(int qd,
     Debug("Pop Callback");
 
     
-    Latency_Start(&process_pop);
     auto addr = dkIncoming.find(qd);
     
     ASSERT(sga.sga_numsegs == 1);
@@ -615,13 +606,10 @@ DkTransport::DkPopCallback(int qd,
     ptr += msgLen;
     
     // Dispatch
-    Latency_Start(&run_app);
     receiver->ReceiveMessage(addr->second,
                              type,
                              data);
-    Latency_End(&run_app);
     free(sga.sga_buf);
-    Latency_End(&process_pop);
 
     Debug("Done processing large %s message", type.c_str());        
 }

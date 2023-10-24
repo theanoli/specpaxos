@@ -6,8 +6,6 @@ CC = gcc
 CXX = g++
 LD = g++
 
-DEMIKERNEL_INCLUDE=/home/thst/demikernel/include
-
 CFLAGS := -g -Wall -pthread -iquote.obj/gen -Wno-uninitialized -DNASSERT -O2
 CXXFLAGS := -std=c++0x
 LDFLAGS := -levent_pthreads -ldl
@@ -40,11 +38,15 @@ LIBUNWIND_LDFLAGS := -lunwind
 CFLAGS += $(LIBUNWIND_CFLAGS)
 LDFLAGS += $(LIBUNWIND_LDFLAGS)
 
-DEMI_CFLAGS := -I$(DEMIKERNEL_INCLUDE)
-# DEMI_LDFLAGS := -L$(dir $(DEMIKERNEL_LIBOS_SO)) -Wl,-rpath,$(dir $(DEMIKERNEL_LIBOS_SO)) -L$(dir $(DEMIKERNEL_LATENCY_A)) -L$(dir $(DEMIKERNEL_COMMON_A)) -L$(dir $(MALLOC)) -Wl,-rpath,$(dir $(MALLOC)) -l:$(notdir $(MALLOC)) -l:$(notdir $(DEMIKERNEL_LIBOS_SO)) -l:$(notdir $(DEMIKERNEL_LATENCY_A)) -l:$(notdir $(DEMIKERNEL_COMMON_A)) -lboost_chrono -lboost_system -lstdc++
-# DEMI_LDFLAGS := -lboost_chrono -lboost_system -lstdc++
+DEMIKERNEL_INCLUDE=/home/thst/demikernel/include
+DEMIKERNEL_LIBOS_SO=/home/thst/lib/libdemikernel.so
+DPDK_INCLUDE=/usr/local/include
+DEMI_CFLAGS := -I$(DEMIKERNEL_INCLUDE) -I$(DPDK_INCLUDE) #-I$(shell pkg-config --cflags libdpdk)
+DEMI_LDFLAGS := -L$(dir $(DEMIKERNEL_LIBOS_SO)) -Wl,-rpath,$(dir $(DEMIKERNEL_LIBOS_SO)) -l:$(notdir $(DEMIKERNEL_LIBOS_SO)) $(shell pkg-config --libs libdpdk) 
+# $(DEMIKERNEL_LATENCY_A)) -L$(dir $(DEMIKERNEL_COMMON_A)) -L$(dir $(MALLOC)) -Wl,-rpath,$(dir $(MALLOC)) -l:$(notdir $(MALLOC)) -l:$(notdir $(DEMIKERNEL_LIBOS_SO)) -l:$(notdir $(DEMIKERNEL_LATENCY_A)) -l:$(notdir $(DEMIKERNEL_COMMON_A)) -lboost_chrono -lboost_system -lstdc++
+# DEMI_LDFLAGS := -L$(dir $(DEMIKERNEL_LIBOS_SO))
 CFLAGS += $(DEMI_CFLAGS)
-# LDFLAGS += $(DEMI_LDFLAGS)
+LDFLAGS += $(DEMI_LDFLAGS)
 
 # Google test framework. This doesn't use pkgconfig
 GTEST_DIR := /usr/src/gtest

@@ -37,7 +37,6 @@
 #include "lib/transport.h"
 #include "lib/transportcommon.h"
 #include "demi/libos.h"
-#include "lib/latency.h"
 #include <event2/event.h>
 
 #include <map>
