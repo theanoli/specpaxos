@@ -38,6 +38,10 @@
 #include <event2/event.h>
 #include <event2/thread.h>
 
+#include <demi/libos.h>
+#include <demi/sga.h>
+#include <demi/wait.h>
+
 #include <random>
 #include <cinttypes>
 
@@ -176,7 +180,7 @@ BindToPort(int qd, const string &host, const string &port)
 
     Notice("Binding to %s:%d", inet_ntoa(sin.sin_addr), htons(sin.sin_port));
 
-    if (demi_bind(qd, (sockaddr *)&sin, sizeof(sin)) < 0) {
+    if (demi_bind(qd, (const struct sockaddr *)&sin, sizeof(sin)) != 0) {
         PPanic("Failed to bind to socket");
     }
 }
@@ -205,9 +209,7 @@ UDPTransport::UDPTransport(double dropRate, double reorderRate,
     // Set up libevent
     event_set_log_callback(LogCallback);
     event_set_fatal_callback(FatalCallback);
-    // XXX Hack for Naveen: allow the user to specify an existing
-    // libevent base. This will probably not work exactly correctly
-    // for error messages or signals, but that doesn't much matter...
+
     evthread_use_pthreads();
     libeventBase = event_base_new();
     evthread_make_base_notifiable(libeventBase);
@@ -220,15 +222,6 @@ UDPTransport::UDPTransport(double dropRate, double reorderRate,
     for (event *x : signalEvents) {
         event_add(x, NULL);
     }
-
-    // Add a timer to check the demikernel event loop 
-    Timer(0, [=]() {
-        shard[i]->Invoke(request_str,
-                          bind(&Client::putCallback,
-                          this, i,
-                          placeholders::_1,
-                          placeholders::_2));
-    });
 }
 
 UDPTransport::~UDPTransport()
@@ -268,11 +261,13 @@ UDPTransport::Register(TransportReceiver *receiver,
 
     // TODO how do we do this? 
     // Enable outgoing broadcast traffic
+	/*
     int n = 1;
     if (setsockopt(qd, SOL_SOCKET,
                    SO_BROADCAST, (char *)&n, sizeof(n)) < 0) {
         PWarning("Failed to set SO_BROADCAST on socket");
     }
+	*/
 
     // TODO check whether we should ignore this...
     /*
@@ -305,15 +300,16 @@ UDPTransport::Register(TransportReceiver *receiver,
         const string &host = config.replica(replicaIdx).host;
         const string &port = config.replica(replicaIdx).port;
         BindToPort(qd, host, port);
-	if (demi_listen(qd, 5) != 0) {
-             PPanic("Failed to listen for Dk connections");
-	}
+		if (demi_listen(qd, 5) != 0) {
+				 PPanic("Failed to listen for Dk connections");
+		}
     } else {
         // Registering a client. Bind to any available host/port
         BindToPort(qd, "", "any");        
     }
 
     /*
+	// TS note: we register a Timer for the Demikernel "event loop" in Run(). 
     // Set up a libevent callback
     event *ev = event_new(libeventBase, qd, EV_READ | EV_PERSIST,
                           SocketCallback, (void *)this);
@@ -329,7 +325,7 @@ UDPTransport::Register(TransportReceiver *receiver,
     if (assert(inet_pton(AF_INET, ip_str, &sin.sin_addr) != 1)) {
         PPanic("Failed to get socket name");
     }
-    DKUDPTransportAddress *addr = new DKUDPTransportAddress(sin);
+    UDPTransportAddress *addr = new DKUDPTransportAddress(sin);
     receiver->SetAddress(addr);
 
     // Update mappings
@@ -346,25 +342,15 @@ SerializeMessage(const ::google::protobuf::Message &m, char **out)
     string type = m.GetTypeName();
     size_t typeLen = type.length();
     size_t dataLen = data.length();
-    ssize_t totalLen = (sizeof(totalLen) + 
-		        sizeof(uint32_t) +
+    ssize_t totalLen = (sizeof(uint32_t) +
                         typeLen + sizeof(typeLen) +
                         dataLen + sizeof(dataLen));
 
     char *buf = new char[totalLen];
-
-    demi_sgarray_t sga; 
-    sga.sga_numsegs = 1;
-    sga.sga_segs[0].sgaseg_buf = p;
-    sga.sga_segs[0].sgaseg_len = totalLen;
     char *ptr = buf;
 
     *(uint32_t *)ptr = NONFRAG_MAGIC;
     ptr += sizeof(uint32_t);
-    ASSERT((size_t)(ptr-buf) < totalLen);
-
-    *((size_t *) ptr) = totalLen;
-    ptr += sizeof(size_t);
     ASSERT((size_t)(ptr-buf) < totalLen);
 
     *((size_t *) ptr) = typeLen;
@@ -372,6 +358,7 @@ SerializeMessage(const ::google::protobuf::Message &m, char **out)
     ASSERT((size_t)(ptr-buf) < totalLen);
 
     ASSERT((size_t)(ptr+typeLen-buf) < totalLen);
+
     memcpy(ptr, type.c_str(), typeLen);
     ptr += typeLen;
     *((size_t *) ptr) = dataLen;
@@ -379,6 +366,7 @@ SerializeMessage(const ::google::protobuf::Message &m, char **out)
 
     ASSERT((size_t)(ptr-buf) < totalLen);
     ASSERT((size_t)(ptr+dataLen-buf) == totalLen);
+
     memcpy(ptr, data.c_str(), dataLen);
     ptr += dataLen;
     
@@ -398,63 +386,27 @@ UDPTransport::SendMessageInternal(TransportReceiver *src,
     char *buf;
     size_t msgLen = SerializeMessage(m, &buf);
 
+	// We should be able to send each message as a single SGA no matter the size...?
+    demi_sgarray_t sga = demi_sgaalloc(msgLen);
+    sga.sga_numsegs = 1;
+	memcpy(sga.sga_segs[0].sgaseg_buf, buf, msgLen);
+
     int qd = qds[src];
 
     demi_qtoken_t t;
-    int ret = demi_push(&t, qd, &sga);
-    ASSERT(ret == 0);
-    
     demi_qresult_t wait_out;
-    ret = demi_wait(&wait_out, t, NULL);
-    ASSERT(ret == 0);
+	int ret; 
 
     Debug("Sent %ld byte %s message to server over Dk",
           totalLen, type.c_str());
+
+	ret = demi_pushto(&t, qd, &sga, (const struct sockaddr *)&sin, sizeof(sin));
+	ASSERT(ret == 0);
+	ret = demi_wait(&wait_out, t, NULL);  // Waits for push to complete
+	ASSERT(ret == 0);
+	ASSERT(wait_out.qr_opcode == DEMI_OPC_PUSH);
     
-    /*
-     * TODO I think we don't have to worry about deconstructing packets like this?
-    // XXX All of this assumes that the socket is going to be
-    // available for writing, which since it's a UDP socket it ought
-    // to be.
-    if (msgLen <= MAX_UDP_MESSAGE_SIZE) {
-        if (sendto(qd, buf, msgLen, 0,
-                   (sockaddr *)&sin, sizeof(sin)) < 0) {
-            PWarning("Failed to send message");
-            goto fail;
-        }
-    } else {
-        msgLen -= sizeof(uint32_t);
-        char *bodyStart = buf + sizeof(uint32_t);
-        int numFrags = ((msgLen-1) / MAX_UDP_MESSAGE_SIZE) + 1;
-        Notice("Sending large %s message in %d fragments",
-               m.GetTypeName().c_str(), numFrags);
-        uint64_t msgId = ++lastFragMsgId;
-        for (size_t fragStart = 0; fragStart < msgLen;
-             fragStart += MAX_UDP_MESSAGE_SIZE) {
-            size_t fragLen = std::min(msgLen - fragStart,
-                                      MAX_UDP_MESSAGE_SIZE);
-            size_t fragHeaderLen = 2*sizeof(size_t) + sizeof(uint64_t) + sizeof(uint32_t);
-            char fragBuf[fragLen + fragHeaderLen];
-            char *ptr = fragBuf;
-            *((uint32_t *)ptr) = FRAG_MAGIC;
-            ptr += sizeof(uint32_t);
-            *((uint64_t *)ptr) = msgId;
-            ptr += sizeof(uint64_t);
-            *((size_t *)ptr) = fragStart;
-            ptr += sizeof(size_t);
-            *((size_t *)ptr) = msgLen;
-            ptr += sizeof(size_t);
-            memcpy(ptr, &bodyStart[fragStart], fragLen);
-            
-            if (sendto(qd, fragBuf, fragLen + fragHeaderLen, 0,
-                       (sockaddr *)&sin, sizeof(sin)) < 0) {
-                PWarning("Failed to send message fragment %ld",
-                         fragStart);
-                goto fail;
-            }
-        }
-    }    
-    */
+	demi_sgafree(&sga);
 
     delete [] buf;
     return true;
@@ -463,58 +415,58 @@ UDPTransport::SendMessageInternal(TransportReceiver *src,
 void
 UDPTransport::Run()
 {
+	// Pop an initial token and "register" the Demikernel check in libevent w/ timer. 
+	demi_qtoken_t token = -1; 
+	int status = demi_pop(&token, qd);
+	tokens.push_back(token);
+
+    Timer(0, DemiTimerCallback);
+
+	// Timer callbacks will trigger here. 
     event_base_dispatch(libeventBase);
 }
 
-// DecodePacket(const char *buf, size_t sz, string &type, string &msg)
-// This is called when a message is popped. 
+// Helper function for OnReadable; called after a packet is read in
 static void
-DecodePacket(demi_sgarray_t &sga)
+DecodePacket(const char *buf, size_t sz, string &type, string &msg)
 {
-    ASSERT(sga.sga_numsegs == 1);
-    uint8_t *ptr = (uint8_t *)sga.sga_segs[0].sgaseg_buf;
-    ASSERT(sga.sga_segs[0].sgaseg_len > 0);
-    uint32_t magic = *(uint32_t *)ptr;
-    Debug("[%x] MAGIC=%x", qd, magic);
-    ptr += sizeof(magic);
-    ASSERT(magic == MAGIC);
-    size_t totalSize = *((size_t *)ptr);
-    ptr += sizeof(totalSize);
+    ssize_t ssz = sz;
+    const char *ptr = buf;
     size_t typeLen = *((size_t *)ptr);
-    ptr += sizeof(typeLen);
-    string type((char *)ptr, typeLen);
+    ptr += sizeof(size_t);
+    ASSERT(ptr-buf < ssz);
+        
+    ASSERT(ptr+typeLen-buf < ssz);
+    type = string(ptr, typeLen);
     ptr += typeLen;
+
     size_t msgLen = *((size_t *)ptr);
-    ptr += sizeof(msgLen);
-    string data((char *)ptr, msgLen);;
+    ptr += sizeof(size_t);
+    ASSERT(ptr-buf < ssz);
+
+    ASSERT(ptr+msgLen-buf <= ssz);
+    msg = string(ptr, msgLen);
     ptr += msgLen;
 }
 
-// TODO overhaul: call this when the message has been received in the event loop. 
-// After it completes, we should demi_pop the same queue we got the message from 
-// (maybe do outside this function though)
 void
-UDPTransport::OnReadable(int qd)
+UDPTransport::OnReadable(demi_qresult_t qr)
 {
+	// I don't know why the UDP code used such a huge buffer 
     const int BUFSIZE = 65536;
+
+	int qd = qr->qr_qd;
+	TransportReceiver *receiver = receivers[qr->qr_qd];
+	demi_sgarray_t *sga = qr->qr_value.sga;
+	ASSERT(sga->sga_numsegs > 0); 
     
-    do {
-        ssize_t sz;
-        char buf[BUFSIZE];
-        sockaddr_in sender;
-        socklen_t senderSize = sizeof(sender);
+	// There should only ever be one segment, apparently
+	for (ssize_t i = 0; i < sga->sga_numsegs; i++) {
+		demi_sgaseg_t *seg = sga->sga_segs[i];
+        ssize_t sz = seg->sgaseg_len;
+        char *buf = seg->sgaseg_buf;
         
-        sz = recvfrom(qd, buf, BUFSIZE, 0,
-                      (struct sockaddr *) &sender, &senderSize);
-        if (sz == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                break;
-            } else {
-                PWarning("Failed to receive message from socket");
-            }
-        }
-        
-        UDPTransportAddress senderAddr(sender);
+        UDPTransportAddress senderAddr(sga->sga_addr);
         string msgType, msg;
 
         // Take a peek at the first field. If it's all zeros, this is
@@ -634,7 +586,9 @@ UDPTransport::OnReadable(int qd)
                   msgType.c_str());
             goto deliver;       // XXX I am a bad person for this.
         }
-    } while (0);
+    }
+    
+    demi_sgafree(sga);
 }
 
 int
@@ -699,88 +653,62 @@ UDPTransport::OnTimer(UDPTransportTimerInfo *info)
     delete info;
 }
 
+// Check if there is anything waiting in the demikernel queue and process, 
+// then re-call the timer
 void
-UDPTransport::DemiCallback()
+UDPTransport::DemiTimerCallback()
 {
-    demi_qtoken_t token;
-    int status = 0;
-
-    demi_qresult_t wait_out;
-    int ready_idx;
-    int status; 
-
     struct timespec ts; 
     ts.tv_sec = 0; 
-    ts.tv_nsec = 5000;  // 5us; TODO set this properly
+    ts.tv_nsec = 0;  // TODO set this properly? Is setting to 0 OK? 
     
+	int status = -1;
+    demi_qresult_t wait_out;
+	int ready_idx;
     status = demi_wait_any(&wait_out, &ready_idx, tokens.data(), tokens.size(), &ts);
     
     // if we got an EOK back from wait
     if (status == 0) {
+		demi_qtoken_t token = -1;
+
         Debug("Found something: qd=%lx", wait_out.qr_qd);
-	// process request
-	demi_sgarray_t &sga = wait_out.qr_value.sga;
-	assert(sga.sga_numsegs > 0);
-	DkPopCallback(wait_out.qr_qd, receivers[wait_out.qr_qd], sga);
-	status = demi_pop(&token, wait_out.qr_qd);
+		// process request
+		demi_sgarray_t &sga = wait_out.qr_value.sga;
+		assert(sga.sga_numsegs > 0);
+		// DkPopCallback(wait_out.qr_qd, receivers[wait_out.qr_qd], sga);
+		DkPopCallback(wait_out);
+		status = demi_pop(&token, wait_out.qr_qd);
     } // else fall through; either timeout or connection closed
     
     // 
+	if (status > 0 && status != ETIMEDOUT) 
+        tokens.erase(tokens.begin()+ready_idx);
+        Warning("Something went wrong---not resetting the timer");
+		FatalCallback(status);  // Maybe not the right input to FatalCallback... 
+    }
+
     if (status == 0) {
         tokens[ready_idx] = token;
-    } else {
-        //assert(status == ECONNRESET || status == ECONNABORTED);
-        CloseConn(wait_out.qr_qd);
-        tokens.erase(tokens.begin()+ready_idx);
-        Warning("Exited loop");
-    }
+	} 
+
+	// Set new timer for future receives
+	Timer(0, DemiTimerCallback);
 }
 
+// This replaces SocketCallback in the original kernel UDP code.
+// When the Timer for checking the demikernel event queue has an event waiting, 
+// it will call DemiTimerCallback. 
+// DemiTimerCallback calls this function on each received packet; DkPopCallback 
+// parses individual packets and combines large fragments into small ones. 
+// This is for RECEIVES ONLY. Sends get handled separately, in SendMessageInternal. 
+// SendMessageInternal is called by SendMessageToAll et al. 
 void
-UDPTransport::SocketCallback(evutil_socket_t qd, short what, void *arg)
-{
-    UDPTransport *transport = (UDPTransport *)arg;
-    if (what & EV_READ) {
-        transport->OnReadable(qd);
-    }
-}
-
-// Not really a callback...?
-void
-DkTransport::DkPopCallback(int qd,
-                           TransportReceiver *receiver,
-                           demi_sgarray_t &sga)
+DkTransport::DkPopCallback(demi_qresult_t &wait_out)
 {
     Debug("Pop Callback");
 
-    // Should call here OnReadable to put the packet(s) together if needed and dispatch the
-    // message
-    
-    auto addr = dkIncoming.find(qd);
-    
-    ASSERT(sga.sga_numsegs == 1);
-    uint8_t *ptr = (uint8_t *)sga.sga_segs[0].sgaseg_buf;
-    ASSERT(sga.sga_segs[0].sgaseg_len > 0);
-    uint32_t magic = *(uint32_t *)ptr;
-    Debug("[%x] MAGIC=%x", qd, magic);
-    ptr += sizeof(magic);
-    ASSERT(magic == MAGIC);
-    size_t totalSize = *((size_t *)ptr);
-    ptr += sizeof(totalSize);
-    size_t typeLen = *((size_t *)ptr);
-    ptr += sizeof(typeLen);
-    string type((char *)ptr, typeLen);
-    ptr += typeLen;
-    size_t msgLen = *((size_t *)ptr);
-    ptr += sizeof(msgLen);
-    string data((char *)ptr, msgLen);;
-    ptr += msgLen;
-    
-    // Dispatch
-    receiver->ReceiveMessage(addr->second,
-                             type,
-                             data);
-    free(sga.sga_buf);
+	// Put packets together and dispatch message to app
+	this->OnReadable(wait_out);
 
     Debug("Done processing large %s message", type.c_str());        
 }
