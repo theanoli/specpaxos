@@ -1,7 +1,7 @@
 // -*- mode: c++; c-file-style: "k&r"; c-basic-offset: 4 -*-
 /***********************************************************************
  *
- * udptransport.h:
+ * dkudptransport.h:
  *   message-passing network interface that uses UDP message delivery
  *   and libasync
  *
