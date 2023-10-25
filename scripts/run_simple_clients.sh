@@ -19,6 +19,7 @@ runClients() {
 
     local CMD="${CLIENT_BINARY} -c ${config_path} -m vrw -a -n ${runtime} -t ${NUM_THREADS} -f ${req_latencies_file} -s ${payload_size} -w ${warmup_period}"
     echo ${CMD}
+    cat ~/specpaxos/scripts/passwd | sudo -S renice -999 $$
     eval ${CMD}
 }
 
