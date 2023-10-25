@@ -57,7 +57,7 @@ private:
     long client_id; // Unique ID for this client.
     long nshards; // Number of shards in niStore
 
-    DkTransport transport; // Transport used by paxos client proxies.
+    DKUDPTransport transport; // Transport used by paxos client proxies.
     thread *clientTransport; // Thread running the transport event loop.
 
     vector<specpaxos::Client *> shard; // List of shard client proxies.

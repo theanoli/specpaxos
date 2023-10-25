@@ -411,7 +411,7 @@ DKUDPTransport::Run()
 	    }
 	}
 
-    Timer(0, DemiTimerCallback);
+    DemiTimer(0);
 
 	// Timer callbacks will trigger here. 
     event_base_dispatch(libeventBase);
@@ -544,6 +544,27 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
 }
 
 int
+DKUDPTransport::DemiTimer(uint64_t ms)
+{
+    DKUDPTransportTimerInfo *info = new DKUDPTransportTimerInfo();
+
+    struct timeval tv;
+    tv.tv_sec = ms/1000;
+    tv.tv_usec = (ms % 1000) * 1000;
+    
+    info->transport = this;
+    info->id = 0;
+    info->ev = event_new(libeventBase, -1, 0,
+                         DemiTimerCallback, info);
+
+    timers[info->id] = info;
+    
+    event_add(info->ev, &tv);
+    
+    return info->id;
+}
+
+int
 DKUDPTransport::Timer(uint64_t ms, timer_callback_t cb)
 {
     DKUDPTransportTimerInfo *info = new DKUDPTransportTimerInfo();
@@ -605,10 +626,24 @@ DKUDPTransport::OnTimer(DKUDPTransportTimerInfo *info)
     delete info;
 }
 
-// Check if there is anything waiting in the demikernel queue and process, 
-// then re-call the timer
 void
-DKUDPTransport::DemiTimerCallback()
+DKUDPTransport::OnDemiTimer(DKUDPTransportTimerInfo *info)
+{
+    timers.erase(info->id);
+    event_del(info->ev);
+    event_free(info->ev);
+    
+    CheckQdCallback(info->transport);
+
+    DemiTimer(0);
+
+    delete info;
+}
+
+// Check if there is anything waiting in the demikernel queue and process. 
+// Timer will be re-set in the caller
+void
+DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 {
     struct timespec ts; 
     ts.tv_sec = 0; 
@@ -618,7 +653,8 @@ DKUDPTransport::DemiTimerCallback()
     demi_qresult_t wait_out;
 	int ready_idx;
     demi_qtoken_t token = -1;
-    status = demi_wait_any(&wait_out, &ready_idx, tokens.data(), tokens.size(), &ts);
+    status = demi_wait_any(&wait_out, &ready_idx, 
+		    transport->tokens.data(), transport->tokens.size(), &ts);
     
     // if we got an EOK back from wait
     if (status == 0) {
@@ -626,7 +662,7 @@ DKUDPTransport::DemiTimerCallback()
 	// process request
 	demi_sgarray_t &sga = wait_out.qr_value.sga;
 	assert(sga.sga_numsegs > 0);
-	OnReadable(wait_out, receivers[wait_out.qr_qd]);
+	transport->OnReadable(wait_out, receivers[wait_out.qr_qd]);
 	status = demi_pop(&token, wait_out.qr_qd);
     }
     
@@ -638,13 +674,21 @@ DKUDPTransport::DemiTimerCallback()
     if (status == 0) {
         tokens[ready_idx] = token;
     } 
-
-	// Set new timer for future receives
-	Timer(0, DemiTimerCallback); 
 }
 
 void
 DKUDPTransport::TimerCallback(evutil_socket_t qd, short what, void *arg)
+{
+    DKUDPTransport::DKUDPTransportTimerInfo *info =
+        (DKUDPTransport::DKUDPTransportTimerInfo *)arg;
+
+    ASSERT(what & EV_TIMEOUT);
+
+    info->transport->OnTimer(info);
+}
+
+void
+DKUDPTransport::DemiTimerCallback(evutil_socket_t qd, short what, void *arg)
 {
     DKUDPTransport::DKUDPTransportTimerInfo *info =
         (DKUDPTransport::DKUDPTransportTimerInfo *)arg;

@@ -76,6 +76,7 @@ public:
                   int replicaIdx);
     void Run();
     int Timer(uint64_t ms, timer_callback_t cb);
+    int DemiTimer(uint64_t ms);
     bool CancelTimer(int id);
     void CancelAllTimers();
     
@@ -108,8 +109,8 @@ private:
     event_base *libeventBase;
     // std::vector<event *> listenerEvents;
     std::vector<event *> signalEvents;
-    static std::vector<demi_qtoken_t> tokens;
-    static std::map<int, TransportReceiver*> receivers; // qd -> receiver
+    std::vector<demi_qtoken_t> tokens;
+    std::map<int, TransportReceiver*> receivers; // qd -> receiver
     std::map<TransportReceiver*, int> qds; // receiver -> qd
     std::map<const specpaxos::Configuration *, int> multicastQds;
     std::map<int, const specpaxos::Configuration *> multicastConfigs;
@@ -134,11 +135,12 @@ private:
     const DKUDPTransportAddress *
     LookupMulticastAddress(const specpaxos::Configuration *cfg);
     void OnTimer(DKUDPTransportTimerInfo *info);
-    static void OnReadable(demi_qresult_t &qr, TransportReceiver *receiver);
-    static void SocketCallback(evutil_socket_t qd,
-                               short what, void *arg);
-    static void DemiTimerCallback(); 
+    void OnDemiTimer(DKUDPTransportTimerInfo *info);
+    void OnReadable(demi_qresult_t &qr, TransportReceiver *receiver);
+    void CheckQdCallback(DKUDPTransport *transport); 
     static void TimerCallback(evutil_socket_t qd,
+                              short what, void *arg);
+    static void DemiTimerCallback(evutil_socket_t qd,
                               short what, void *arg);
     static void LogCallback(int severity, const char *msg);
     static void FatalCallback(int err);

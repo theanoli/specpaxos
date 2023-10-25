@@ -493,7 +493,7 @@ UDPTransport::Run()
 static void
 DecodePacket(const char *buf, size_t sz, string &type, string &msg)
 {
-    ssize_t ssz = sz;
+    [[maybe_unused]] ssize_t ssz = sz;
     const char *ptr = buf;
     size_t typeLen = *((size_t *)ptr);
     ptr += sizeof(size_t);
