@@ -2,7 +2,7 @@
 /***********************************************************************
  *
  * udptransport.cc:
- *   message-passing network interface that uses UDP message delivery
+ *   message-passing network interface that uses DKUDP message delivery
  *   and libasync
  *
  * Copyright 2013-2016 Dan R. K. Ports  <drkp@cs.washington.edu>
@@ -38,10 +38,6 @@
 #include <event2/event.h>
 #include <event2/thread.h>
 
-#include <demi/libos.h>
-#include <demi/sga.h>
-#include <demi/wait.h>
-
 #include <random>
 #include <cinttypes>
 
@@ -54,7 +50,7 @@
 #include <netdb.h>
 #include <signal.h>
 
-const size_t MAX_UDP_MESSAGE_SIZE = 9000; // XXX
+const size_t MAX_DKUDP_MESSAGE_SIZE = 9000; // XXX
 const int SOCKET_BUF_SIZE = 10485760;
 
 const uint64_t NONFRAG_MAGIC = 0x20050318;
@@ -62,36 +58,36 @@ const uint64_t FRAG_MAGIC = 0x20101010;
 
 using std::pair;
 
-UDPTransportAddress::UDPTransportAddress(const sockaddr_in &addr)
+DKUDPTransportAddress::DKUDPTransportAddress(const sockaddr_in &addr)
     : addr(addr)
 {
     memset((void *)addr.sin_zero, 0, sizeof(addr.sin_zero));
 }
 
-UDPTransportAddress *
-UDPTransportAddress::clone() const
+DKUDPTransportAddress *
+DKUDPTransportAddress::clone() const
 {
-    UDPTransportAddress *c = new UDPTransportAddress(*this);
+    DKUDPTransportAddress *c = new DKUDPTransportAddress(*this);
     return c;    
 }
 
-bool operator==(const UDPTransportAddress &a, const UDPTransportAddress &b)
+bool operator==(const DKUDPTransportAddress &a, const DKUDPTransportAddress &b)
 {
     return (memcmp(&a.addr, &b.addr, sizeof(a.addr)) == 0);
 }
 
-bool operator!=(const UDPTransportAddress &a, const UDPTransportAddress &b)
+bool operator!=(const DKUDPTransportAddress &a, const DKUDPTransportAddress &b)
 {
     return !(a == b);
 }
 
-bool operator<(const UDPTransportAddress &a, const UDPTransportAddress &b)
+bool operator<(const DKUDPTransportAddress &a, const DKUDPTransportAddress &b)
 {
     return (memcmp(&a.addr, &b.addr, sizeof(a.addr)) < 0);
 }
 
-UDPTransportAddress
-UDPTransport::LookupAddress(const specpaxos::ReplicaAddress &addr)
+DKUDPTransportAddress
+DKUDPTransport::LookupAddress(const specpaxos::ReplicaAddress &addr)
 {
     int res;
     struct addrinfo hints;
@@ -107,22 +103,22 @@ UDPTransport::LookupAddress(const specpaxos::ReplicaAddress &addr)
     if (ai->ai_addr->sa_family != AF_INET) {
         Panic("getaddrinfo returned a non IPv4 address");
     }
-    UDPTransportAddress out =
-              UDPTransportAddress(*((sockaddr_in *)ai->ai_addr));
+    DKUDPTransportAddress out =
+              DKUDPTransportAddress(*((sockaddr_in *)ai->ai_addr));
     freeaddrinfo(ai);
     return out;
 }
 
-UDPTransportAddress
-UDPTransport::LookupAddress(const specpaxos::Configuration &config,
+DKUDPTransportAddress
+DKUDPTransport::LookupAddress(const specpaxos::Configuration &config,
                             int idx)
 {
     const specpaxos::ReplicaAddress &addr = config.replica(idx);
     return LookupAddress(addr);
 }
 
-const UDPTransportAddress *
-UDPTransport::LookupMulticastAddress(const specpaxos::Configuration
+const DKUDPTransportAddress *
+DKUDPTransport::LookupMulticastAddress(const specpaxos::Configuration
                                      *config)
 {
     if (!config->multicast()) {
@@ -130,7 +126,7 @@ UDPTransport::LookupMulticastAddress(const specpaxos::Configuration
         return NULL;
     }
 
-    if (multicastFds.find(config) != multicastFds.end()) {
+    if (multicastQds.find(config) != multicastQds.end()) {
         // We are listening on this multicast address. Some
         // implementations of MOM aren't OK with us both sending to
         // and receiving from the same address, so don't look up the
@@ -138,8 +134,8 @@ UDPTransport::LookupMulticastAddress(const specpaxos::Configuration
         return NULL;
     }
 
-    UDPTransportAddress *addr =
-        new UDPTransportAddress(LookupAddress(*(config->multicast())));
+    DKUDPTransportAddress *addr =
+        new DKUDPTransportAddress(LookupAddress(*(config->multicast())));
     return addr;
 }
 
@@ -149,7 +145,7 @@ BindToPort(int qd, const string &host, const string &port)
     struct sockaddr_in sin;
 
     if ((host == "") && (port == "any")) {
-        // Set up the sockaddr so we're OK with any UDP socket
+        // Set up the sockaddr so we're OK with any DKUDP socket
         memset(&sin, 0, sizeof(sin));
         sin.sin_family = AF_INET;
         sin.sin_port = 0;        
@@ -185,7 +181,7 @@ BindToPort(int qd, const string &host, const string &port)
     }
 }
 
-UDPTransport::UDPTransport(double dropRate, double reorderRate,
+DKUDPTransport::DKUDPTransport(double dropRate, double reorderRate,
                            int dscp, event_base *evbase)
     : dropRate(dropRate), reorderRate(reorderRate),
       dscp(dscp)
@@ -198,12 +194,11 @@ UDPTransport::UDPTransport(double dropRate, double reorderRate,
 
     uniformDist = std::uniform_real_distribution<double>(0.0,1.0);
     randomEngine.seed(time(NULL));
-    reorderBuffer.valid = false;
     if (dropRate > 0) {
-        Warning("Dropping packets with probability %g", dropRate);
+        Panic("Drop rate unimplemented");
     }
     if (reorderRate > 0) {
-        Warning("Reordering packets with probability %g", reorderRate);
+        Panic("Reorder rate unimplemented");
     }
     
     // Set up libevent
@@ -224,7 +219,7 @@ UDPTransport::UDPTransport(double dropRate, double reorderRate,
     }
 }
 
-UDPTransport::~UDPTransport()
+DKUDPTransport::~DKUDPTransport()
 {
     // XXX Shut down libevent?
 
@@ -235,14 +230,11 @@ UDPTransport::~UDPTransport()
 }
 
 void
-UDPTransport::Register(TransportReceiver *receiver,
+DKUDPTransport::Register(TransportReceiver *receiver,
                        const specpaxos::Configuration &config,
                        int replicaIdx)
 {
     ASSERT(replicaIdx < config.n);
-
-    const specpaxos::Configuration *canonicalConfig =
-        RegisterConfiguration(receiver, config, replicaIdx);
 
     this->replicaIdx = replicaIdx;
 
@@ -301,7 +293,7 @@ UDPTransport::Register(TransportReceiver *receiver,
         const string &port = config.replica(replicaIdx).port;
         BindToPort(qd, host, port);
 		if (demi_listen(qd, 5) != 0) {
-				 PPanic("Failed to listen for Dk connections");
+				 PPanic("Failed to listen for DKUDP connections");
 		}
     } else {
         // Registering a client. Bind to any available host/port
@@ -319,20 +311,19 @@ UDPTransport::Register(TransportReceiver *receiver,
 
     // Tell the receiver its address
     struct sockaddr_in sin;
-    socklen_t sinsize = sizeof(sin);
     sin.sin_family = AF_INET;
-    sin.sin_port = htons(config.replica(replicaIdx).port);
-    if (assert(inet_pton(AF_INET, ip_str, &sin.sin_addr) != 1)) {
+    sin.sin_port = htons(stoi(config.replica(replicaIdx).port));
+    if (inet_pton(AF_INET, config.replica(replicaIdx).host.c_str(), &sin.sin_addr) != 1) {
         PPanic("Failed to get socket name");
     }
-    UDPTransportAddress *addr = new DKUDPTransportAddress(sin);
+    DKUDPTransportAddress *addr = new DKUDPTransportAddress(sin);
     receiver->SetAddress(addr);
 
     // Update mappings
     receivers[qd] = receiver;
     qds[receiver] = qd;
 
-    Notice("Listening on UDP port %hu", ntohs(sin.sin_port));
+    Notice("Listening on DKUDP port %hu", ntohs(sin.sin_port));
 }
 
 static size_t
@@ -375,12 +366,12 @@ SerializeMessage(const ::google::protobuf::Message &m, char **out)
 }
 
 bool
-UDPTransport::SendMessageInternal(TransportReceiver *src,
-                                  const UDPTransportAddress &dst,
+DKUDPTransport::SendMessageInternal(TransportReceiver *src,
+                                  const DKUDPTransportAddress &dst,
                                   const Message &m,
                                   bool multicast)
 {
-    sockaddr_in sin = dynamic_cast<const UDPTransportAddress &>(dst).addr;
+    sockaddr_in sin = dynamic_cast<const DKUDPTransportAddress &>(dst).addr;
 
     // Serialize message
     char *buf;
@@ -392,20 +383,15 @@ UDPTransport::SendMessageInternal(TransportReceiver *src,
 	memcpy(sga.sga_segs[0].sgaseg_buf, buf, msgLen);
 
     int qd = qds[src];
-
+    [[maybe_unused]] int ret; 
     demi_qtoken_t t;
     demi_qresult_t wait_out;
-	int ret; 
-
-    Debug("Sent %ld byte %s message to server over Dk",
-          totalLen, type.c_str());
-
 	ret = demi_pushto(&t, qd, &sga, (const struct sockaddr *)&sin, sizeof(sin));
 	ASSERT(ret == 0);
 	ret = demi_wait(&wait_out, t, NULL);  // Waits for push to complete
 	ASSERT(ret == 0);
 	ASSERT(wait_out.qr_opcode == DEMI_OPC_PUSH);
-    
+
 	demi_sgafree(&sga);
 
     delete [] buf;
@@ -413,12 +399,17 @@ UDPTransport::SendMessageInternal(TransportReceiver *src,
 }
 
 void
-UDPTransport::Run()
+DKUDPTransport::Run()
 {
 	// Pop an initial token and "register" the Demikernel check in libevent w/ timer. 
-	demi_qtoken_t token = -1; 
-	int status = demi_pop(&token, qd);
-	tokens.push_back(token);
+        demi_qtoken_t token = -1; 
+	for (const auto &it : receivers) {
+	    int status = demi_pop(&token, it.first);
+	    tokens.push_back(token);
+	    if (status != 0) {
+		return;
+	    }
+	}
 
     Timer(0, DemiTimerCallback);
 
@@ -430,7 +421,7 @@ UDPTransport::Run()
 static void
 DecodePacket(const char *buf, size_t sz, string &type, string &msg)
 {
-    ssize_t ssz = sz;
+    [[maybe_unused]] ssize_t ssz = sz;
     const char *ptr = buf;
     size_t typeLen = *((size_t *)ptr);
     ptr += sizeof(size_t);
@@ -450,23 +441,19 @@ DecodePacket(const char *buf, size_t sz, string &type, string &msg)
 }
 
 void
-UDPTransport::OnReadable(demi_qresult_t qr)
+DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
 {
-	// I don't know why the UDP code used such a huge buffer 
-    const int BUFSIZE = 65536;
-
-	int qd = qr->qr_qd;
-	TransportReceiver *receiver = receivers[qr->qr_qd];
-	demi_sgarray_t *sga = qr->qr_value.sga;
+	// int qd = qr.qr_qd;
+	demi_sgarray_t *sga = &qr.qr_value.sga;
 	ASSERT(sga->sga_numsegs > 0); 
     
 	// There should only ever be one segment, apparently
 	for (ssize_t i = 0; i < sga->sga_numsegs; i++) {
-		demi_sgaseg_t *seg = sga->sga_segs[i];
+		demi_sgaseg_t *seg = &sga->sga_segs[i];
         ssize_t sz = seg->sgaseg_len;
-        char *buf = seg->sgaseg_buf;
+        char *buf = (char *)seg->sgaseg_buf;
         
-        UDPTransportAddress senderAddr(sga->sga_addr);
+        DKUDPTransportAddress senderAddr(sga->sga_addr);
         string msgType, msg;
 
         // Take a peek at the first field. If it's all zeros, this is
@@ -478,6 +465,8 @@ UDPTransport::OnReadable(demi_qresult_t qr)
             DecodePacket(buf+sizeof(uint32_t), sz-sizeof(uint32_t),
                          msgType, msg);
         } else if (magic == FRAG_MAGIC) {
+	    Panic("Weren't supposed to get here...");
+		/*
             // This is a fragment. Decode the header
             const char *ptr = buf;
             ptr += sizeof(uint32_t);
@@ -492,10 +481,10 @@ UDPTransport::OnReadable(demi_qresult_t qr)
             ptr += sizeof(size_t);
             ASSERT(ptr-buf < sz);
             ASSERT(buf+sz-ptr == (ssize_t) std::min(msgLen-fragStart,
-                                                    MAX_UDP_MESSAGE_SIZE));
+                                                    MAX_DKUDP_MESSAGE_SIZE));
             Notice("Received fragment of %zd byte packet %" PRIx64 " starting at %zd",
                    msgLen, msgId, fragStart);
-            UDPTransportFragInfo &info = fragInfo[senderAddr];
+            DKUDPTransportFragInfo &info = fragInfo[senderAddr];
             if (info.msgId == 0) {
                 info.msgId = msgId;
                 info.data.clear();
@@ -524,37 +513,13 @@ UDPTransport::OnReadable(demi_qresult_t qr)
             } else {
                 continue;
             }
+	    */
         } else {
             Warning("Received packet with bad magic number");
         }
-        
-        // Dispatch
-        if (dropRate > 0.0) {
-            double roll = uniformDist(randomEngine);
-            if (roll < dropRate) {
-                Debug("Simulating packet drop of message type %s",
-                      msgType.c_str());
-                continue;
-            }
-        }
 
-        if (!reorderBuffer.valid && (reorderRate > 0.0)) {
-            double roll = uniformDist(randomEngine);
-            if (roll < reorderRate) {
-                Debug("Simulating reorder of message type %s",
-                      msgType.c_str());
-                ASSERT(!reorderBuffer.valid);
-                reorderBuffer.valid = true;
-                reorderBuffer.addr = new UDPTransportAddress(senderAddr);
-                reorderBuffer.message = msg;
-                reorderBuffer.msgType = msgType;
-                reorderBuffer.qd = qd;
-                continue;
-            }
-        }
-
-    deliver:
         // Was this received on a multicast qd?
+	/*
         auto it = multicastConfigs.find(qd);
         if (it != multicastConfigs.end()) {
             // If so, deliver the message to all replicas for that
@@ -563,7 +528,7 @@ UDPTransport::OnReadable(demi_qresult_t qr)
             const specpaxos::Configuration *cfg = it->second;
             for (auto &kv : replicaReceivers[cfg]) {
                 TransportReceiver *receiver = kv.second;
-                const UDPTransportAddress &raddr = 
+                const DKUDPTransportAddress &raddr = 
                     replicaAddresses[cfg].find(kv.first)->second;
                 // Don't deliver a message to the sending replica
                 if (raddr != senderAddr) {
@@ -571,30 +536,17 @@ UDPTransport::OnReadable(demi_qresult_t qr)
                 }
             }
         } else {
-            TransportReceiver *receiver = receivers[qd];
-            receiver->ReceiveMessage(senderAddr, msgType, msg);
-        }
-
-        if (reorderBuffer.valid) {
-            reorderBuffer.valid = false;
-            msg = reorderBuffer.message;
-            msgType = reorderBuffer.msgType;
-            qd = reorderBuffer.qd;
-            senderAddr = *(reorderBuffer.addr);
-            delete reorderBuffer.addr;
-            Debug("Delivering reordered packet of type %s",
-                  msgType.c_str());
-            goto deliver;       // XXX I am a bad person for this.
-        }
+	*/
+        receiver->ReceiveMessage(senderAddr, msgType, msg);
     }
     
     demi_sgafree(sga);
 }
 
 int
-UDPTransport::Timer(uint64_t ms, timer_callback_t cb)
+DKUDPTransport::Timer(uint64_t ms, timer_callback_t cb)
 {
-    UDPTransportTimerInfo *info = new UDPTransportTimerInfo();
+    DKUDPTransportTimerInfo *info = new DKUDPTransportTimerInfo();
 
     struct timeval tv;
     tv.tv_sec = ms/1000;
@@ -616,9 +568,9 @@ UDPTransport::Timer(uint64_t ms, timer_callback_t cb)
 }
 
 bool
-UDPTransport::CancelTimer(int id)
+DKUDPTransport::CancelTimer(int id)
 {
-    UDPTransportTimerInfo *info = timers[id];
+    DKUDPTransportTimerInfo *info = timers[id];
 
     if (info == NULL) {
         return false;
@@ -633,7 +585,7 @@ UDPTransport::CancelTimer(int id)
 }
 
 void
-UDPTransport::CancelAllTimers()
+DKUDPTransport::CancelAllTimers()
 {
     while (!timers.empty()) {
         auto kv = timers.begin();
@@ -642,7 +594,7 @@ UDPTransport::CancelAllTimers()
 }
 
 void
-UDPTransport::OnTimer(UDPTransportTimerInfo *info)
+DKUDPTransport::OnTimer(DKUDPTransportTimerInfo *info)
 {
     timers.erase(info->id);
     event_del(info->ev);
@@ -656,7 +608,7 @@ UDPTransport::OnTimer(UDPTransportTimerInfo *info)
 // Check if there is anything waiting in the demikernel queue and process, 
 // then re-call the timer
 void
-UDPTransport::DemiTimerCallback()
+DKUDPTransport::DemiTimerCallback()
 {
     struct timespec ts; 
     ts.tv_sec = 0; 
@@ -665,59 +617,37 @@ UDPTransport::DemiTimerCallback()
 	int status = -1;
     demi_qresult_t wait_out;
 	int ready_idx;
+    demi_qtoken_t token = -1;
     status = demi_wait_any(&wait_out, &ready_idx, tokens.data(), tokens.size(), &ts);
     
     // if we got an EOK back from wait
     if (status == 0) {
-		demi_qtoken_t token = -1;
-
-        Debug("Found something: qd=%lx", wait_out.qr_qd);
-		// process request
-		demi_sgarray_t &sga = wait_out.qr_value.sga;
-		assert(sga.sga_numsegs > 0);
-		// DkPopCallback(wait_out.qr_qd, receivers[wait_out.qr_qd], sga);
-		DkPopCallback(wait_out);
-		status = demi_pop(&token, wait_out.qr_qd);
-    } // else fall through; either timeout or connection closed
+        Debug("Found something: qd=%d", wait_out.qr_qd);
+	// process request
+	demi_sgarray_t &sga = wait_out.qr_value.sga;
+	assert(sga.sga_numsegs > 0);
+	OnReadable(wait_out, receivers[wait_out.qr_qd]);
+	status = demi_pop(&token, wait_out.qr_qd);
+    }
     
-    // 
-	if (status > 0 && status != ETIMEDOUT) 
-        tokens.erase(tokens.begin()+ready_idx);
+    if (status > 0 && status != ETIMEDOUT)  {
         Warning("Something went wrong---not resetting the timer");
 		FatalCallback(status);  // Maybe not the right input to FatalCallback... 
     }
 
     if (status == 0) {
         tokens[ready_idx] = token;
-	} 
+    } 
 
 	// Set new timer for future receives
-	Timer(0, DemiTimerCallback);
-}
-
-// This replaces SocketCallback in the original kernel UDP code.
-// When the Timer for checking the demikernel event queue has an event waiting, 
-// it will call DemiTimerCallback. 
-// DemiTimerCallback calls this function on each received packet; DkPopCallback 
-// parses individual packets and combines large fragments into small ones. 
-// This is for RECEIVES ONLY. Sends get handled separately, in SendMessageInternal. 
-// SendMessageInternal is called by SendMessageToAll et al. 
-void
-DkTransport::DkPopCallback(demi_qresult_t &wait_out)
-{
-    Debug("Pop Callback");
-
-	// Put packets together and dispatch message to app
-	this->OnReadable(wait_out);
-
-    Debug("Done processing large %s message", type.c_str());        
+	Timer(0, DemiTimerCallback); 
 }
 
 void
-UDPTransport::TimerCallback(evutil_socket_t qd, short what, void *arg)
+DKUDPTransport::TimerCallback(evutil_socket_t qd, short what, void *arg)
 {
-    UDPTransport::UDPTransportTimerInfo *info =
-        (UDPTransport::UDPTransportTimerInfo *)arg;
+    DKUDPTransport::DKUDPTransportTimerInfo *info =
+        (DKUDPTransport::DKUDPTransportTimerInfo *)arg;
 
     ASSERT(what & EV_TIMEOUT);
 
@@ -725,7 +655,7 @@ UDPTransport::TimerCallback(evutil_socket_t qd, short what, void *arg)
 }
 
 void
-UDPTransport::LogCallback(int severity, const char *msg)
+DKUDPTransport::LogCallback(int severity, const char *msg)
 {
     Message_Type msgType;
     switch (severity) {
@@ -749,15 +679,15 @@ UDPTransport::LogCallback(int severity, const char *msg)
 }
 
 void
-UDPTransport::FatalCallback(int err)
+DKUDPTransport::FatalCallback(int err)
 {
     Panic("Fatal libevent error: %d", err);
 }
 
 void
-UDPTransport::SignalCallback(evutil_socket_t qd, short what, void *arg)
+DKUDPTransport::SignalCallback(evutil_socket_t qd, short what, void *arg)
 {
     Notice("Terminating on SIGTERM/SIGINT");
-    UDPTransport *transport = (UDPTransport *)arg;
+    DKUDPTransport *transport = (DKUDPTransport *)arg;
     event_base_loopbreak(transport->libeventBase);
 }

@@ -2,7 +2,7 @@
 /***********************************************************************
  *
  * udptransport.h:
- *   message-passing network interface that uses UDP message delivery
+ *   message-passing network interface that uses DKUDP message delivery
  *   and libasync
  *
  * Copyright 2013-2016 Dan R. K. Ports  <drkp@cs.washington.edu>
@@ -29,14 +29,18 @@
  *
  **********************************************************************/
 
-#ifndef _LIB_UDPTRANSPORT_H_
-#define _LIB_UDPTRANSPORT_H_
+#ifndef _LIB_DKUDPTRANSPORT_H_
+#define _LIB_DKUDPTRANSPORT_H_
 
 #include "lib/configuration.h"
 #include "lib/transport.h"
 #include "lib/transportcommon.h"
 
 #include <event2/event.h>
+
+#include <demi/libos.h>
+#include <demi/sga.h>
+#include <demi/wait.h>
 
 #include <map>
 #include <list>
@@ -45,28 +49,28 @@
 #include <random>
 #include <netinet/in.h>
 
-class UDPTransportAddress : public TransportAddress
+class DKUDPTransportAddress : public TransportAddress
 {
 public:
-    UDPTransportAddress * clone() const;
+    DKUDPTransportAddress * clone() const;
 private:
-    UDPTransportAddress(const sockaddr_in &addr);
+    DKUDPTransportAddress(const sockaddr_in &addr);
     sockaddr_in addr;
-    friend class UDPTransport;
-    friend bool operator==(const UDPTransportAddress &a,
-                           const UDPTransportAddress &b);
-    friend bool operator!=(const UDPTransportAddress &a,
-                           const UDPTransportAddress &b);
-    friend bool operator<(const UDPTransportAddress &a,
-                          const UDPTransportAddress &b);
+    friend class DKUDPTransport;
+    friend bool operator==(const DKUDPTransportAddress &a,
+                           const DKUDPTransportAddress &b);
+    friend bool operator!=(const DKUDPTransportAddress &a,
+                           const DKUDPTransportAddress &b);
+    friend bool operator<(const DKUDPTransportAddress &a,
+                          const DKUDPTransportAddress &b);
 };
 
-class UDPTransport : public TransportCommon<UDPTransportAddress>
+class DKUDPTransport : public TransportCommon<DKUDPTransportAddress>
 {
 public:
-    UDPTransport(double dropRate = 0.0, double reorderRate = 0.0,
+    DKUDPTransport(double dropRate = 0.0, double reorderRate = 0.0,
                  int dscp = 0, event_base *evbase = nullptr);
-    virtual ~UDPTransport();
+    virtual ~DKUDPTransport();
     void Register(TransportReceiver *receiver,
                   const specpaxos::Configuration &config,
                   int replicaIdx);
@@ -79,9 +83,9 @@ private:
     int acceptQD;
     int replicaIdx; 
 
-    struct UDPTransportTimerInfo
+    struct DKUDPTransportTimerInfo
     {
-        UDPTransport *transport;
+        DKUDPTransport *transport;
         timer_callback_t cb;
         event *ev;
         int id;
@@ -94,7 +98,7 @@ private:
     struct
     {
         bool valid;
-        UDPTransportAddress *addr;
+        DKUDPTransportAddress *addr;
         string msgType;
         string message;
         int qd;
@@ -104,37 +108,36 @@ private:
     event_base *libeventBase;
     // std::vector<event *> listenerEvents;
     std::vector<event *> signalEvents;
-    std::vector<demi_qtoken_t> tokens;
-    std::map<int, TransportReceiver*> receivers; // qd -> receiver
+    static std::vector<demi_qtoken_t> tokens;
+    static std::map<int, TransportReceiver*> receivers; // qd -> receiver
     std::map<TransportReceiver*, int> qds; // receiver -> qd
     std::map<const specpaxos::Configuration *, int> multicastQds;
     std::map<int, const specpaxos::Configuration *> multicastConfigs;
     int lastTimerId;
-    std::map<int, UDPTransportTimerInfo *> timers;
+    std::map<int, DKUDPTransportTimerInfo *> timers;
     uint64_t lastFragMsgId;
-    struct UDPTransportFragInfo
+    struct DKUDPTransportFragInfo
     {
         uint64_t msgId;
         string data;
     };
-    std::map<UDPTransportAddress, UDPTransportFragInfo> fragInfo;
+    std::map<DKUDPTransportAddress, DKUDPTransportFragInfo> fragInfo;
 
     bool SendMessageInternal(TransportReceiver *src,
-                             const UDPTransportAddress &dst,
+                             const DKUDPTransportAddress &dst,
                              const Message &m, bool multicast = false);
-    UDPTransportAddress
+    DKUDPTransportAddress
     LookupAddress(const specpaxos::ReplicaAddress &addr);
-    UDPTransportAddress
+    DKUDPTransportAddress
     LookupAddress(const specpaxos::Configuration &cfg,
                   int replicaIdx);
-    const UDPTransportAddress *
+    const DKUDPTransportAddress *
     LookupMulticastAddress(const specpaxos::Configuration *cfg);
-    void ListenOnMulticastPort(const specpaxos::Configuration
-                               *canonicalConfig);
-    void OnReadable(int qd);
-    void OnTimer(UDPTransportTimerInfo *info);
+    void OnTimer(DKUDPTransportTimerInfo *info);
+    static void OnReadable(demi_qresult_t &qr, TransportReceiver *receiver);
     static void SocketCallback(evutil_socket_t qd,
                                short what, void *arg);
+    static void DemiTimerCallback(); 
     static void TimerCallback(evutil_socket_t qd,
                               short what, void *arg);
     static void LogCallback(int severity, const char *msg);
@@ -143,4 +146,4 @@ private:
                                short what, void *arg);
 };
 
-#endif  // _LIB_UDPTRANSPORT_H_
+#endif  // _LIB_DKUDPTRANSPORT_H_

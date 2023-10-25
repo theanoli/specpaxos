@@ -13,7 +13,7 @@
 #include "lib/configuration.h"
 #include "common/replica.h"
 #include "lib/udptransport.h"
-#include "lib/dktransport.h"
+#include "lib/dkudptransport.h"
 #include "spec/replica.h"
 #include "vr/replica.h"
 #include "vrw/replica.h"

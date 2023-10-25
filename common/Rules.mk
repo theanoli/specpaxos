@@ -14,6 +14,6 @@ OBJS-client := $(o)client.o \
 
 OBJS-replica := $(o)replica.o $(o)log.o \
                 $(LIB-message) $(LIB-request) \
-                $(LIB-configuration) $(LIB-dktransport) $(LIB-udptransport)
+                $(LIB-configuration) $(LIB-dkudptransport) $(LIB-udptransport)
 
 include $(d)tests/Rules.mk

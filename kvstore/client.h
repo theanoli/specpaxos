@@ -13,7 +13,7 @@
 #include "lib/assert.h"
 #include "lib/message.h"
 #include "lib/udptransport.h"
-#include "lib/dktransport.h"
+#include "lib/dkudptransport.h"
 #include "common/client.h"
 #include "lib/configuration.h"
 #include "spec/client.h"
