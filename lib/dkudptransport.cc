@@ -142,7 +142,9 @@ DKUDPTransport::LookupMulticastAddress(const specpaxos::Configuration
 static void
 BindToPort(int qd, const string &host, const string &port)
 {
-    struct sockaddr_in sin;
+    Notice("Binding to socket at qd %d", qd);
+    struct sockaddr_in sin = {0};
+    int int_port = -1; 
 
     if ((host == "") && (port == "any")) {
         // Set up the sockaddr so we're OK with any DKUDP socket
@@ -150,6 +152,7 @@ BindToPort(int qd, const string &host, const string &port)
         sin.sin_family = AF_INET;
         sin.sin_port = 0;        
     } else {
+	/*
         // Otherwise, look up its hostname and port number (which
         // might be a service name)
         struct addrinfo hints;
@@ -170,15 +173,24 @@ BindToPort(int qd, const string &host, const string &port)
             Panic("getaddrinfo returned a non IPv4 address");        
         }
         sin = *(sockaddr_in *)ai->ai_addr;
-        
         freeaddrinfo(ai);
+	*/
+	
+	sscanf(port.c_str(), "%d", &int_port);
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(int_port);
+    }
+    if (inet_pton(AF_INET, host.c_str(), &(sin.sin_addr)) != 1) {
+	Panic("Couldn't convert address to network format!");	    
     }
 
-    Notice("Binding to %s:%d", inet_ntoa(sin.sin_addr), htons(sin.sin_port));
-
-    if (demi_bind(qd, (const struct sockaddr *)&sin, sizeof(sin)) != 0) {
+    if (demi_bind(qd, (const struct sockaddr *)&sin, sizeof(struct sockaddr_in)) != 0) {
         PPanic("Failed to bind to socket");
     }
+    Notice("Bound to %s:%d (input: %s:%s)", 
+		    inet_ntoa(sin.sin_addr), htons(sin.sin_port), 
+		    host.c_str(), port.c_str());
+
 }
 
 DKUDPTransport::DKUDPTransport(double dropRate, double reorderRate,
@@ -186,14 +198,15 @@ DKUDPTransport::DKUDPTransport(double dropRate, double reorderRate,
     : dropRate(dropRate), reorderRate(reorderRate),
       dscp(dscp)
 {
-    char *argv[] = {};
-    demi_init(0, argv);
+    char str[] = "catnip";
+    char *argv[] = {str};
+    if (demi_init(1, argv) != 0) {
+        PPanic("Failed to initialize Demikernel");	    
+    }
 
     lastTimerId = 0;
     lastFragMsgId = 0;
 
-    uniformDist = std::uniform_real_distribution<double>(0.0,1.0);
-    randomEngine.seed(time(NULL));
     if (dropRate > 0) {
         Panic("Drop rate unimplemented");
     }
@@ -239,8 +252,8 @@ DKUDPTransport::Register(TransportReceiver *receiver,
     this->replicaIdx = replicaIdx;
 
     // Create socket
-    int qd;
-    if ((qd = demi_socket(&qd, AF_INET, SOCK_DGRAM, 0)) < 0) {
+    int qd = -1;
+    if ((demi_socket(&qd, AF_INET, SOCK_DGRAM, 0)) != 0) {
         PPanic("Failed to create socket to listen");
     }
 
@@ -297,7 +310,7 @@ DKUDPTransport::Register(TransportReceiver *receiver,
 		}
     } else {
         // Registering a client. Bind to any available host/port
-        BindToPort(qd, "", "any");        
+        BindToPort(qd, "198.0.0.1", "9000");        
     }
 
     /*
@@ -312,10 +325,15 @@ DKUDPTransport::Register(TransportReceiver *receiver,
     // Tell the receiver its address
     struct sockaddr_in sin;
     sin.sin_family = AF_INET;
-    sin.sin_port = htons(stoi(config.replica(replicaIdx).port));
+    sin.sin_port = htons(9000);
+    if (inet_pton(AF_INET, "198.0.0.1", &sin.sin_addr) != 1) {
+        PPanic("Failed to get socket name");
+    }
+    /*
     if (inet_pton(AF_INET, config.replica(replicaIdx).host.c_str(), &sin.sin_addr) != 1) {
         PPanic("Failed to get socket name");
     }
+    */
     DKUDPTransportAddress *addr = new DKUDPTransportAddress(sin);
     receiver->SetAddress(addr);
 
@@ -401,6 +419,7 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
 void
 DKUDPTransport::Run()
 {
+	Notice("In the run loop.");
 	// Pop an initial token and "register" the Demikernel check in libevent w/ timer. 
         demi_qtoken_t token = -1; 
 	for (const auto &it : receivers) {
@@ -411,8 +430,10 @@ DKUDPTransport::Run()
 	    }
 	}
 
-    DemiTimer(0);
+    Notice("Registering the Demikernel timer in libevent.");
+    DemiTimer(1);
 
+    Notice("Dispatching the libevent base.");
 	// Timer callbacks will trigger here. 
     event_base_dispatch(libeventBase);
 }
@@ -635,7 +656,7 @@ DKUDPTransport::OnDemiTimer(DKUDPTransportTimerInfo *info)
     
     CheckQdCallback(info->transport);
 
-    DemiTimer(0);
+    DemiTimer(1);
 
     delete info;
 }
@@ -695,7 +716,7 @@ DKUDPTransport::DemiTimerCallback(evutil_socket_t qd, short what, void *arg)
 
     ASSERT(what & EV_TIMEOUT);
 
-    info->transport->OnTimer(info);
+    info->transport->OnDemiTimer(info);
 }
 
 void
