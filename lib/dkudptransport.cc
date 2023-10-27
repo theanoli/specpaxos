@@ -358,6 +358,8 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
     sga.sga_numsegs = 1;
 	memcpy(sga.sga_segs[0].sgaseg_buf, buf, msgLen);
 
+    Notice("Sending message to node %s, length is %d", buf, msgLen);
+
     int qd = qds[src];
     [[maybe_unused]] int ret; 
     demi_qtoken_t t;
