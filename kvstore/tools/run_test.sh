@@ -167,7 +167,7 @@ client_count=1
 for host in ${clients[@]}
 do
   echo "Cleaning up log on client $host..."
-  ssh $host "rm $logdir/client.*.log"
+  ssh $host "mkdir -p $logdir/prev_logs; mv $logdir/client.*.log $logdir/prev_logs"
   client_count=$((client_count+1))
   if [ $client_count -gt $nclients ]; then
 	  break

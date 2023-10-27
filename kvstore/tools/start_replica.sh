@@ -17,7 +17,7 @@ for ((i=0; i<$n; i++))
 do
   let line=$i+2 
   server=$(cat $config | sed -n ${line}p | awk -F'[ :]' '{print $2}')
-  command="ssh $server \"mkdir -p $logdir; source $HOME/specpaxos/kvstore/tools/set_demi_env.sh; taskset -c $i sudo -E $cmd -c $config -i $i > $logdir/$shard.replica$i.log 2>&1 &\""
+  command="ssh $server \"mkdir -p $logdir; source $HOME/specpaxos/kvstore/tools/set_demi_env.sh; echo splashed-grimace-grass3 | taskset -c $i sudo -SE $cmd -c $config -i $i > $logdir/$shard.replica$i.log 2>&1 &\""
   echo $command
   eval $command
   echo "Done with replica $i"
