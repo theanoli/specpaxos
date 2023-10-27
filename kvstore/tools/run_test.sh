@@ -116,7 +116,7 @@ for host in ${clients[@]}
 do
   ssh $host "mkdir -p $srcdir/logs; $srcdir/kvstore/tools/start_client.sh \"$srcdir/kvstore/$client \
   -c $configdir/shard -N $nshard -f $srcdir/kvstore/tools/keys \
-  -d $rtime -w $wper -k $nkeys -m $mode -e $err -z $zalpha\" \
+  -d $rtime -w $wper -k $nkeys -m $mode -e $err -z $zalpha -h $host -r 9000\" \
   $count $nclient_threads $logdir"
 
   let count=$count+$nclient_threads

@@ -64,6 +64,8 @@ public:
     Configuration(std::ifstream &file);
     virtual ~Configuration();
     ReplicaAddress replica(int idx) const;
+    ReplicaAddress client() const;
+    void setClientAddress(string host, string port, int idx);
     const ReplicaAddress *multicast() const;
     inline int GetLeaderIndex(view_t view) const {
         return (view % n);
@@ -82,6 +84,7 @@ private:
     std::vector<ReplicaAddress> replicas;
     ReplicaAddress *multicastAddress;
     bool hasMulticast;
+    ReplicaAddress clientAddress;  // Will be unpopulated if this is a replica
 };
 
 }      // namespace specpaxos

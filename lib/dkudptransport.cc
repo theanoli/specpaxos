@@ -146,40 +146,10 @@ BindToPort(int qd, const string &host, const string &port)
     struct sockaddr_in sin = {0};
     int int_port = -1; 
 
-    if ((host == "") && (port == "any")) {
-        // Set up the sockaddr so we're OK with any DKUDP socket
-        memset(&sin, 0, sizeof(sin));
-        sin.sin_family = AF_INET;
-        sin.sin_port = 0;        
-    } else {
-	/*
-        // Otherwise, look up its hostname and port number (which
-        // might be a service name)
-        struct addrinfo hints;
-        hints.ai_family   = AF_INET;
-        hints.ai_socktype = SOCK_DGRAM;
-        hints.ai_protocol = 0;
-        hints.ai_flags    = AI_PASSIVE;
-        struct addrinfo *ai;
-        int res;
-        if ((res = getaddrinfo(host.c_str(), port.c_str(),
-                               &hints, &ai))) {
-            Panic("Failed to resolve host/port %s:%s: %s",
-                  host.c_str(), port.c_str(), gai_strerror(res));
-        }
-        ASSERT(ai->ai_family == AF_INET);
-        ASSERT(ai->ai_socktype == SOCK_DGRAM);
-        if (ai->ai_addr->sa_family != AF_INET) {
-            Panic("getaddrinfo returned a non IPv4 address");        
-        }
-        sin = *(sockaddr_in *)ai->ai_addr;
-        freeaddrinfo(ai);
-	*/
-	
-	sscanf(port.c_str(), "%d", &int_port);
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(int_port);
-    }
+    sscanf(port.c_str(), "%d", &int_port);
+    sin.sin_family = AF_INET;
+    sin.sin_port = htons(int_port);
+
     if (inet_pton(AF_INET, host.c_str(), &(sin.sin_addr)) != 1) {
 	Panic("Couldn't convert address to network format!");	    
     }
@@ -298,42 +268,30 @@ DKUDPTransport::Register(TransportReceiver *receiver,
         PWarning("Failed to set SO_SNDBUF on socket");
     }
     */
+
+    string host;
+    string port;
     
     if (replicaIdx != -1) {
         // Registering a replica. Bind socket to the designated
         // host/port
-        const string &host = config.replica(replicaIdx).host;
-        const string &port = config.replica(replicaIdx).port;
-        BindToPort(qd, host, port);
-		if (demi_listen(qd, 5) != 0) {
-				 PPanic("Failed to listen for DKUDP connections");
-		}
+        host = config.replica(replicaIdx).host;
+        port = config.replica(replicaIdx).port;
     } else {
         // Registering a client. Bind to any available host/port
-        BindToPort(qd, "198.0.0.1", "9000");        
+	host = config.client().host;
+	port = config.client().port;
     }
-
-    /*
-	// TS note: we register a Timer for the Demikernel "event loop" in Run(). 
-    // Set up a libevent callback
-    event *ev = event_new(libeventBase, qd, EV_READ | EV_PERSIST,
-                          SocketCallback, (void *)this);
-    event_add(ev, NULL);
-    listenerEvents.push_back(ev);
-    */
+    BindToPort(qd, host, port);
 
     // Tell the receiver its address
     struct sockaddr_in sin;
     sin.sin_family = AF_INET;
-    sin.sin_port = htons(9000);
-    if (inet_pton(AF_INET, "198.0.0.1", &sin.sin_addr) != 1) {
+    sin.sin_port = htons(stoi(port));
+    if (inet_pton(AF_INET, host.c_str(), &sin.sin_addr) != 1) {
         PPanic("Failed to get socket name");
     }
-    /*
-    if (inet_pton(AF_INET, config.replica(replicaIdx).host.c_str(), &sin.sin_addr) != 1) {
-        PPanic("Failed to get socket name");
-    }
-    */
+
     DKUDPTransportAddress *addr = new DKUDPTransportAddress(sin);
     receiver->SetAddress(addr);
 
@@ -436,6 +394,7 @@ DKUDPTransport::Run()
     Notice("Dispatching the libevent base.");
 	// Timer callbacks will trigger here. 
     event_base_dispatch(libeventBase);
+    Notice("Exited the libevent loop!");
 }
 
 // Helper function for OnReadable; called after a packet is read in
@@ -668,7 +627,7 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 {
     struct timespec ts; 
     ts.tv_sec = 0; 
-    ts.tv_nsec = 0;  // TODO set this properly? Is setting to 0 OK? 
+    ts.tv_nsec = 1000;  // TODO set this properly? Is setting to 0 OK? 
     
 	int status = -1;
     demi_qresult_t wait_out;

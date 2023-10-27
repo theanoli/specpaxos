@@ -46,7 +46,8 @@ class Client
 {
 public:
     /* Constructor needs path to shard configs and number of shards. */
-    Client(Proto mode, string configPath, int nshards);
+    Client(Proto mode, string configPath, int nshards, 
+		    int threadidx, string host, string port);
     ~Client();
 
     /* API Calls for KVStore. */

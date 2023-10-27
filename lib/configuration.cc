@@ -54,7 +54,8 @@ ReplicaAddress::operator==(const ReplicaAddress &other) const {
 
 
 Configuration::Configuration(const Configuration &c)
-    : n(c.n), f(c.f), replicas(c.replicas), hasMulticast(c.hasMulticast)
+    : n(c.n), f(c.f), replicas(c.replicas), hasMulticast(c.hasMulticast), 
+	clientAddress(c.clientAddress)
 {
     multicastAddress = NULL;
     if (hasMulticast) {
@@ -65,7 +66,7 @@ Configuration::Configuration(const Configuration &c)
 Configuration::Configuration(int n, int f,
                              std::vector<ReplicaAddress> replicas,
                              ReplicaAddress *multicastAddress)
-    : n(n), f(f), replicas(replicas)
+    : n(n), f(f), replicas(replicas), clientAddress("0", "0")
 {
     if (multicastAddress) {
         hasMulticast = true;
@@ -77,7 +78,7 @@ Configuration::Configuration(int n, int f,
     }
 }
 
-Configuration::Configuration(std::ifstream &file)
+Configuration::Configuration(std::ifstream &file) : clientAddress("0", "0")
 {
     f = -1;
     hasMulticast = false;
@@ -168,6 +169,18 @@ ReplicaAddress
 Configuration::replica(int idx) const
 {
     return replicas[idx];
+}
+
+ReplicaAddress
+Configuration::client() const
+{
+    return clientAddress;
+}
+
+void
+Configuration::setClientAddress(string host, string port, int idx)
+{
+    clientAddress = ReplicaAddress(host, std::to_string(stoi(port) + idx));
 }
 
 const ReplicaAddress *

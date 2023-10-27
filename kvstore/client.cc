@@ -11,7 +11,8 @@
 
 namespace kvstore {
 
-Client::Client(Proto mode, string configPath, int nShards)
+Client::Client(Proto mode, string configPath, int nShards, int threadIdx, 
+		string host, string port)
     : transport(0.0, 0.0, 0)
 {
     // Initialize all state here;
@@ -35,6 +36,8 @@ Client::Client(Proto mode, string configPath, int nShards)
             exit(0);
         }
         specpaxos::Configuration shardConfig(shardConfigStream);
+
+	shardConfig.setClientAddress(host, port, threadIdx);
 
         switch (mode) {
             case PROTO_VR:
@@ -71,6 +74,7 @@ void
 Client::run_client()
 {
     transport.Run();
+    Notice("Client %lu has finished.", client_id);
 }
 
 /* Returns the value corresponding to the supplied key. */

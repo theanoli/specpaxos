@@ -26,9 +26,13 @@ main(int argc, char **argv)
     const char *keysPath = NULL;
     int duration = 10;
     int nShards = 1;
+    int threadIdx = 0;
     int writePercentage = 50; // Out of 100
     int error = 0; // error bars
     bool populate = false;
+
+    string host = ""; 
+    string port = "";
 
     vector<string> keys;
     string key, value;
@@ -36,7 +40,7 @@ main(int argc, char **argv)
     kvstore::Proto mode = kvstore::PROTO_UNKNOWN;
 
     int opt;
-    while ((opt = getopt(argc, argv, "z:c:d:N:l:w:k:f:m:e:p")) != -1) {
+    while ((opt = getopt(argc, argv, "h:r:i:z:c:d:N:l:w:k:f:m:e:p")) != -1) {
         switch (opt) {
         case 'c': // Configuration path
         { 
@@ -54,6 +58,28 @@ main(int argc, char **argv)
         case 'f': // Generated keys path
         { 
             keysPath = optarg;
+            break;
+        }
+
+	case 'r':
+	{
+            port = optarg;
+	    break;
+	}
+
+	case 'h':
+	{
+            host = optarg;
+	    break;
+	}
+
+        case 'i': // Thread index
+        { 
+            char *strtolPtr;
+            threadIdx = strtoul(optarg, &strtolPtr, 10);
+            if ((*optarg == '\0') || (*strtolPtr != '\0')) {
+                fprintf(stderr, "option -n requires a numeric arg\n");
+            }
             break;
         }
 
@@ -150,7 +176,12 @@ main(int argc, char **argv)
         exit(0);
     }
 
-    kvstore::Client client(mode, configPath, nShards);
+    if (host == "" || port == "") {
+	fprintf(stderr, "need client host and port number");
+	exit(0);
+    }
+
+    kvstore::Client client(mode, configPath, nShards, threadIdx, host, port);
 
     // Read in the keys from a file and populate the key-value store.
     ifstream in;
