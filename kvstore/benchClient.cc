@@ -215,6 +215,7 @@ main(int argc, char **argv)
     srand(t0.tv_sec + t0.tv_usec);
 
     while (1) {
+	fprintf(stdout, "Generating a request\n");
         gettimeofday(&t1, NULL);
 
 		key = keys[rand_key()];
