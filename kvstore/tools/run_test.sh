@@ -55,7 +55,7 @@ nshard=1     # number of shards
 nkeys=1000 # number of keys to use
 rtime=30     # duration to run
 
-wper=50       # writes percentage
+wper=100       # writes percentage
 err=0        # error
 zalpha=0.9    # zipf alpha (-1 to disable zipf and enable uniform)
 

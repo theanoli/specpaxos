@@ -114,6 +114,7 @@ Configuration::Configuration(std::ifstream &file) : clientAddress("0", "0")
             if (!arg) {
                 Panic ("'replica' configuration line requires an argument");
             }
+	    Notice("Parsing line %s", arg);
 
             char *host = strtok(arg, ":");
             char *port = strtok(NULL, "");
@@ -123,6 +124,7 @@ Configuration::Configuration(std::ifstream &file) : clientAddress("0", "0")
             }
 
             replicas.push_back(ReplicaAddress(string(host), string(port)));
+	    Notice("Registered replica %s:%s", host, port);
         } else if (strcasecmp(cmd, "multicast") == 0) {
             char *arg = strtok(NULL, " \t");
             if (!arg) {

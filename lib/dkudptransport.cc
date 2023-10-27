@@ -142,7 +142,6 @@ DKUDPTransport::LookupMulticastAddress(const specpaxos::Configuration
 static void
 BindToPort(int qd, const string &host, const string &port)
 {
-    Notice("Binding to socket at qd %d", qd);
     struct sockaddr_in sin = {0};
     int int_port = -1; 
 
@@ -221,64 +220,25 @@ DKUDPTransport::Register(TransportReceiver *receiver,
 
     this->replicaIdx = replicaIdx;
 
+    const specpaxos::Configuration *canonicalConfig =
+        RegisterConfiguration(receiver, config, replicaIdx);
+
     // Create socket
     int qd = -1;
     if ((demi_socket(&qd, AF_INET, SOCK_DGRAM, 0)) != 0) {
         PPanic("Failed to create socket to listen");
     }
 
-    /*
-    // Put it in non-blocking mode
-    if (fcntl(qd, F_SETFL, O_NONBLOCK, 1)) {
-        PWarning("Failed to set O_NONBLOCK");
-    }
-    */
-
-    // TODO how do we do this? 
-    // Enable outgoing broadcast traffic
-	/*
-    int n = 1;
-    if (setsockopt(qd, SOL_SOCKET,
-                   SO_BROADCAST, (char *)&n, sizeof(n)) < 0) {
-        PWarning("Failed to set SO_BROADCAST on socket");
-    }
-	*/
-
-    // TODO check whether we should ignore this...
-    /*
-    if (dscp != 0) {
-        n = dscp << 2;
-        if (setsockopt(qd, IPPROTO_IP,
-                       IP_TOS, (char *)&n, sizeof(n)) < 0) {
-            PWarning("Failed to set DSCP on socket");
-        }
-    }
-    */
-    
-    // Increase buffer size
-    // TODO how? 
-    /*
-    n = SOCKET_BUF_SIZE;
-    if (setsockopt(qd, SOL_SOCKET,
-                   SO_RCVBUF, (char *)&n, sizeof(n)) < 0) {
-        PWarning("Failed to set SO_RCVBUF on socket");
-    }
-    if (setsockopt(qd, SOL_SOCKET,
-                   SO_SNDBUF, (char *)&n, sizeof(n)) < 0) {
-        PWarning("Failed to set SO_SNDBUF on socket");
-    }
-    */
-
     string host;
     string port;
     
     if (replicaIdx != -1) {
-        // Registering a replica. Bind socket to the designated
+        // Registering a replica.
         // host/port
         host = config.replica(replicaIdx).host;
         port = config.replica(replicaIdx).port;
     } else {
-        // Registering a client. Bind to any available host/port
+        // Registering a client.
 	host = config.client().host;
 	port = config.client().port;
     }
@@ -298,8 +258,6 @@ DKUDPTransport::Register(TransportReceiver *receiver,
     // Update mappings
     receivers[qd] = receiver;
     qds[receiver] = qd;
-
-    Notice("Listening on DKUDP port %hu", ntohs(sin.sin_port));
 }
 
 static size_t
@@ -350,25 +308,33 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
     sockaddr_in sin = dynamic_cast<const DKUDPTransportAddress &>(dst).addr;
 
     // Serialize message
+    Debug("Preparing to seralize message to %s:%d", 
+		    inet_ntoa(sin.sin_addr), htons(sin.sin_port));
     char *buf;
     size_t msgLen = SerializeMessage(m, &buf);
+    Debug("Serialized");
 
 	// We should be able to send each message as a single SGA no matter the size...?
     demi_sgarray_t sga = demi_sgaalloc(msgLen);
-    sga.sga_numsegs = 1;
-	memcpy(sga.sga_segs[0].sgaseg_buf, buf, msgLen);
+    memcpy(sga.sga_segs[0].sgaseg_buf, buf, msgLen);
 
     int qd = qds[src];
     [[maybe_unused]] int ret; 
-    demi_qtoken_t t;
-    demi_qresult_t wait_out;
-	ret = demi_pushto(&t, qd, &sga, (const struct sockaddr *)&sin, sizeof(sin));
-	ASSERT(ret == 0);
-	ret = demi_wait(&wait_out, t, NULL);  // Waits for push to complete
-	ASSERT(ret == 0);
-	ASSERT(wait_out.qr_opcode == DEMI_OPC_PUSH);
-
-	demi_sgafree(&sga);
+    demi_qtoken_t t = -1;
+    demi_qresult_t wait_out = {}; 
+    ret = demi_pushto(&t, qd, &sga, (const struct sockaddr *)&sin, sizeof(sin));
+    if (ret != 0) {
+	Panic("Problem pushing to demiqueue");	    
+    }
+    ret = demi_wait(&wait_out, t, NULL);  // Waits for push to complete
+    if (ret != 0) {
+	Panic("Problem waiting for push to complete");	    
+    }
+    if (wait_out.qr_opcode != DEMI_OPC_PUSH) {
+	Panic("Something weird---got wrong return opcode!");
+    }
+    
+    demi_sgafree(&sga);
 
     delete [] buf;
     return true;
@@ -377,22 +343,21 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
 void
 DKUDPTransport::Run()
 {
-	Notice("In the run loop.");
-	// Pop an initial token and "register" the Demikernel check in libevent w/ timer. 
-        demi_qtoken_t token = -1; 
-	for (const auto &it : receivers) {
-	    int status = demi_pop(&token, it.first);
-	    tokens.push_back(token);
-	    if (status != 0) {
-		return;
-	    }
-	}
+    Debug("In the run loop.");
+    // Pop an initial token and "register" the Demikernel check in libevent w/ timer. 
+    demi_qtoken_t token = -1; 
+    for (const auto &it : receivers) {
+        int status = demi_pop(&token, it.first);
+        tokens.push_back(token);
+        if (status != 0) {
+	    return;
+        }
+    }
 
-    Notice("Registering the Demikernel timer in libevent.");
+    Debug("Registering the Demikernel timer in libevent; %d tokens.", tokens.size());
     DemiTimer(1);
 
-    Notice("Dispatching the libevent base.");
-	// Timer callbacks will trigger here. 
+    Debug("Dispatching the libevent base.");
     event_base_dispatch(libeventBase);
     Notice("Exited the libevent loop!");
 }
@@ -434,6 +399,9 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
         char *buf = (char *)seg->sgaseg_buf;
         
         DKUDPTransportAddress senderAddr(sga->sga_addr);
+	senderAddr.addr.sin_port = htons(senderAddr.addr.sin_port);
+	Debug("Got something to read from %s:%d!",
+		    inet_ntoa(senderAddr.addr.sin_addr), htons(senderAddr.addr.sin_port));
         string msgType, msg;
 
         // Take a peek at the first field. If it's all zeros, this is
@@ -446,77 +414,10 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
                          msgType, msg);
         } else if (magic == FRAG_MAGIC) {
 	    Panic("Weren't supposed to get here...");
-		/*
-            // This is a fragment. Decode the header
-            const char *ptr = buf;
-            ptr += sizeof(uint32_t);
-            ASSERT(ptr-buf < sz);
-            uint64_t msgId = *((uint64_t *)ptr);
-            ptr += sizeof(uint64_t);
-            ASSERT(ptr-buf < sz);
-            size_t fragStart = *((size_t *)ptr);
-            ptr += sizeof(size_t);
-            ASSERT(ptr-buf < sz);
-            size_t msgLen = *((size_t *)ptr);
-            ptr += sizeof(size_t);
-            ASSERT(ptr-buf < sz);
-            ASSERT(buf+sz-ptr == (ssize_t) std::min(msgLen-fragStart,
-                                                    MAX_DKUDP_MESSAGE_SIZE));
-            Notice("Received fragment of %zd byte packet %" PRIx64 " starting at %zd",
-                   msgLen, msgId, fragStart);
-            DKUDPTransportFragInfo &info = fragInfo[senderAddr];
-            if (info.msgId == 0) {
-                info.msgId = msgId;
-                info.data.clear();
-            }
-            if (info.msgId != msgId) {
-                ASSERT(msgId > info.msgId);
-                Warning("Failed to reconstruct packet %" PRIx64 "", info.msgId);
-                info.msgId = msgId;
-                info.data.clear();
-            }
-            
-            if (fragStart != info.data.size()) {
-                Warning("Fragments out of order for packet %" PRIx64 "; "
-                        "expected start %zd, got %zd",
-                        msgId, info.data.size(), fragStart);
-                continue;
-            }
-            
-            info.data.append(string(ptr, buf+sz-ptr));
-            if (info.data.size() == msgLen) {
-                Debug("Completed packet reconstruction");
-                DecodePacket(info.data.c_str(), info.data.size(),
-                             msgType, msg);
-                info.msgId = 0;
-                info.data.clear();
-            } else {
-                continue;
-            }
-	    */
         } else {
             Warning("Received packet with bad magic number");
         }
 
-        // Was this received on a multicast qd?
-	/*
-        auto it = multicastConfigs.find(qd);
-        if (it != multicastConfigs.end()) {
-            // If so, deliver the message to all replicas for that
-            // config, *except* if that replica was the sender of the
-            // message.
-            const specpaxos::Configuration *cfg = it->second;
-            for (auto &kv : replicaReceivers[cfg]) {
-                TransportReceiver *receiver = kv.second;
-                const DKUDPTransportAddress &raddr = 
-                    replicaAddresses[cfg].find(kv.first)->second;
-                // Don't deliver a message to the sending replica
-                if (raddr != senderAddr) {
-                    receiver->ReceiveMessage(senderAddr, msgType, msg);
-                }
-            }
-        } else {
-	*/
         receiver->ReceiveMessage(senderAddr, msgType, msg);
     }
     
@@ -615,7 +516,7 @@ DKUDPTransport::OnDemiTimer(DKUDPTransportTimerInfo *info)
     
     CheckQdCallback(info->transport);
 
-    DemiTimer(1);
+    info->transport->DemiTimer(1);
 
     delete info;
 }
@@ -627,11 +528,11 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 {
     struct timespec ts; 
     ts.tv_sec = 0; 
-    ts.tv_nsec = 1000;  // TODO set this properly? Is setting to 0 OK? 
+    ts.tv_nsec = 5000;  // TODO set this properly? Is setting to 0 OK? 
     
 	int status = -1;
-    demi_qresult_t wait_out;
-	int ready_idx;
+    demi_qresult_t wait_out = {};
+	int ready_idx = -1;
     demi_qtoken_t token = -1;
     status = demi_wait_any(&wait_out, &ready_idx, 
 		    transport->tokens.data(), transport->tokens.size(), &ts);
@@ -642,23 +543,24 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 	// process request
 	demi_sgarray_t &sga = wait_out.qr_value.sga;
 	assert(sga.sga_numsegs > 0);
-	transport->OnReadable(wait_out, receivers[wait_out.qr_qd]);
+	transport->OnReadable(wait_out, transport->receivers[wait_out.qr_qd]);
 	status = demi_pop(&token, wait_out.qr_qd);
-    }
-    
-    if (status > 0 && status != ETIMEDOUT)  {
-        Warning("Something went wrong---not resetting the timer");
-		FatalCallback(status);  // Maybe not the right input to FatalCallback... 
+        if (status == 0) {
+            transport->tokens[ready_idx] = token;
+	    return;
+        }
     }
 
-    if (status == 0) {
-        tokens[ready_idx] = token;
-    } 
+    if (status != 0 && status != ETIMEDOUT)  {
+        Warning("Something went wrong---not resetting the timer");
+	FatalCallback(status);  // Maybe not the right input to FatalCallback... 
+    }
 }
 
 void
 DKUDPTransport::TimerCallback(evutil_socket_t qd, short what, void *arg)
 {
+	Debug("Timer went off!\n");
     DKUDPTransport::DKUDPTransportTimerInfo *info =
         (DKUDPTransport::DKUDPTransportTimerInfo *)arg;
 
