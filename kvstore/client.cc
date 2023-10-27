@@ -24,7 +24,7 @@ Client::Client(Proto mode, string configPath, int nShards, int threadIdx,
     nshards = nShards;
     shard.reserve(nshards);
 
-    Debug("Initializing KVStore client with id [%lu]", client_id);
+    Notice("Initializing KVStore client with id [%lu]", client_id);
 
     /* Start a client for each shard. */
     for (int i = 0; i < nShards; i++) {
@@ -61,7 +61,7 @@ Client::Client(Proto mode, string configPath, int nShards, int threadIdx,
     /* Run the transport in a new thread. */
     clientTransport = new thread(&Client::run_client, this);
 
-    Debug("KVStore client [%lu] created!", client_id);
+    Notice("KVStore client [%lu] created!", client_id);
 }
 
 Client::~Client()
@@ -87,7 +87,7 @@ Client::Get(const string &key, string &value)
     int i = key_to_shard(key);
 
     // Send the GET operation to appropriate shard.
-    Debug("[shard %d] Sending GET [%s]", i, key.c_str());
+    Notice("[shard %d] Sending GET [%s]", i, key.c_str());
     string request_str;
     Request request;
     request.set_op(Request::GET);
@@ -104,9 +104,9 @@ Client::Get(const string &key, string &value)
     });
 
     // Wait for reply from shard.
-    Debug("[shard %d] Waiting for GET reply", i);
+    Notice("[shard %d] Waiting for GET reply", i);
     cv.wait(lk);
-    Debug("[shard %d] GET reply received", i);
+    Notice("[shard %d] GET reply received", i);
 
     // Reply from shard should be available in "replica_reply".
     value = replica_reply;
@@ -122,7 +122,7 @@ Client::Put(const string &key, const string &value)
 
     int i = key_to_shard(key);
 
-    Debug("[shard %d] Sending PUT [%s]", i, key.c_str());
+    Notice("[shard %d] Sending PUT [%s]", i, key.c_str());
     string request_str;
     Request request;
     request.set_op(Request::PUT);
@@ -140,9 +140,9 @@ Client::Put(const string &key, const string &value)
     });
 
     // Wait for reply from shard.
-    Debug("[shard %d] Waiting for PUT reply", i);
+    Notice("[shard %d] Waiting for PUT reply", i);
     cv.wait(lk);
-    Debug("[shard %d] PUT reply received", i);
+    Notice("[shard %d] PUT reply received", i);
 
     // PUT operation should have suceeded. Return.
 }
@@ -157,7 +157,7 @@ Client::getCallback(const int index, const string &request_str, const string &re
     // Copy reply to "replica_reply".
     Reply reply;
     reply.ParseFromString(reply_str);
-    Debug("[shard %d] GET callback [%d]", index, reply.status());
+    Notice("[shard %d] GET callback [%d]", index, reply.status());
 
     if (reply.status() >= 0) {
         status = true;
@@ -179,7 +179,7 @@ Client::putCallback(const int index, const string &request_str, const string &re
     // PUTs always returns success, so no need to check reply.
     Reply reply;
     reply.ParseFromString(reply_str);
-    Debug("[shard %d] PUT callback [%d]", index, reply.status());
+    Notice("[shard %d] PUT callback [%d]", index, reply.status());
 
     // Wake up thread waiting for the reply.
     cv.notify_all();

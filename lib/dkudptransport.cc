@@ -659,6 +659,7 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 void
 DKUDPTransport::TimerCallback(evutil_socket_t qd, short what, void *arg)
 {
+	Notice("Timer went off!\n");
     DKUDPTransport::DKUDPTransportTimerInfo *info =
         (DKUDPTransport::DKUDPTransportTimerInfo *)arg;
 
@@ -670,6 +671,7 @@ DKUDPTransport::TimerCallback(evutil_socket_t qd, short what, void *arg)
 void
 DKUDPTransport::DemiTimerCallback(evutil_socket_t qd, short what, void *arg)
 {
+	Notice("DemiTimer went off!\n");
     DKUDPTransport::DKUDPTransportTimerInfo *info =
         (DKUDPTransport::DKUDPTransportTimerInfo *)arg;
 
