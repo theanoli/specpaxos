@@ -14,6 +14,12 @@ THREADS=$5
 rm -rf ../../logs
 mkdir -p ../../logs
 
+logdir=logs,$CONFIG,$VERSION
+
+mkdir -p $logdir
+
+destfile=$CHECK_READS,$CLIENT_DEVICES,$THREADS
+
 runNum=0
 while true ; do
 	if [ -e "$logdir/$destfile,$runNum,.us" ]; then
@@ -28,12 +34,6 @@ done
 date > $logdir/$destfile,$runNum,.stdout
 
 ./run_test.sh $CHECK_READS $CLIENT_DEVICES $THREADS
-
-logdir=logs,$CONFIG,$VERSION
-
-mkdir -p $logdir
-
-destfile=$CHECK_READS,$CLIENT_DEVICES,$THREADS
 
 mv ../../logs/client.log $logdir/$destfile,$runNum,.us
 cat ../../logs/* > $logdir/$destfile,$runNum,.stderr
