@@ -96,6 +96,7 @@ SimulatedTransport::SendMessageInternal(TransportReceiver *src,
                                         const Message &m,
                                         bool multicast)
 {
+	Notice("in simulated");
     ASSERT(!multicast);
     
     int dst = dstAddr.addr;

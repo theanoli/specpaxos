@@ -426,6 +426,7 @@ UDPTransport::SendMessageInternal(TransportReceiver *src,
                                   const Message &m,
                                   bool multicast)
 {
+	Notice("In UDP");
     sockaddr_in sin = dynamic_cast<const UDPTransportAddress &>(dst).addr;
 
     // Serialize message

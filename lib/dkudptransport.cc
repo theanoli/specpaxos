@@ -350,8 +350,10 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
     sockaddr_in sin = dynamic_cast<const DKUDPTransportAddress &>(dst).addr;
 
     // Serialize message
+    Notice("Preparing to serialize message");
     char *buf;
     size_t msgLen = SerializeMessage(m, &buf);
+    Notice("Serialized");
 
 	// We should be able to send each message as a single SGA no matter the size...?
     demi_sgarray_t sga = demi_sgaalloc(msgLen);
