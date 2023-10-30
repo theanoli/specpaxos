@@ -52,6 +52,8 @@ fi
 tn=0
 ./kill_replicas.sh "$CONFIG" > "$logdir/$destfile,$tn,$runNum,.stdout" 2> "$logdir/$destfile,$tn,$runNum,.stderr"
 
+date >> "$logdir/$destfile,$tn,$runNum,.stdout"
+
 set +e
 # launch replicas
 ./spawn_replicas.sh "$CONFIG" >> "$logdir/$destfile,$tn,$runNum,.stdout" 2>> "$logdir/$destfile,$tn,$runNum,.stderr"
