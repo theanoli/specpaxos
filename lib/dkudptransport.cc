@@ -221,6 +221,9 @@ DKUDPTransport::Register(TransportReceiver *receiver,
 
     this->replicaIdx = replicaIdx;
 
+    const specpaxos::Configuration *canonicalConfig =
+        RegisterConfiguration(receiver, config, replicaIdx);
+
     // Create socket
     int qd = -1;
     if ((demi_socket(&qd, AF_INET, SOCK_DGRAM, 0)) != 0) {
