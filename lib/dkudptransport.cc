@@ -387,18 +387,18 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
 void
 DKUDPTransport::Run()
 {
-	Notice("In the run loop.");
-	// Pop an initial token and "register" the Demikernel check in libevent w/ timer. 
-        demi_qtoken_t token = -1; 
-	for (const auto &it : receivers) {
-	    int status = demi_pop(&token, it.first);
-	    tokens.push_back(token);
-	    if (status != 0) {
-		return;
-	    }
-	}
+    Notice("In the run loop.");
+    // Pop an initial token and "register" the Demikernel check in libevent w/ timer. 
+    demi_qtoken_t token = -1; 
+    for (const auto &it : receivers) {
+        int status = demi_pop(&token, it.first);
+        tokens.push_back(token);
+        if (status != 0) {
+	    return;
+        }
+    }
 
-    Notice("Registering the Demikernel timer in libevent.");
+    Notice("Registering the Demikernel timer in libevent; %d tokens.", tokens.size());
     DemiTimer(1);
 
     Notice("Dispatching the libevent base.");
@@ -641,9 +641,10 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
     ts.tv_nsec = 1000;  // TODO set this properly? Is setting to 0 OK? 
     
 	int status = -1;
-    demi_qresult_t wait_out;
+    demi_qresult_t wait_out = {};
 	int ready_idx;
     demi_qtoken_t token = -1;
+    Notice("Waiting on %d tokens", transport->tokens.size());
     status = demi_wait_any(&wait_out, &ready_idx, 
 		    transport->tokens.data(), transport->tokens.size(), &ts);
     
@@ -653,7 +654,7 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 	// process request
 	demi_sgarray_t &sga = wait_out.qr_value.sga;
 	assert(sga.sga_numsegs > 0);
-	transport->OnReadable(wait_out, receivers[wait_out.qr_qd]);
+	transport->OnReadable(wait_out, transport->receivers[wait_out.qr_qd]);
 	status = demi_pop(&token, wait_out.qr_qd);
     }
     
@@ -663,7 +664,7 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
     }
 
     if (status == 0) {
-        tokens[ready_idx] = token;
+        transport->tokens[ready_idx] = token;
     } 
 }
 
