@@ -17,9 +17,9 @@ for ((i=$begin; i<$end; i++))
 do
   cpuid=$((counter % `nproc`))
   if [ $begin == 0 ]; then
-	  command="cat ~/specpaxos/scripts/passwd | sudo -S renice -999 $BASHPID && taskset -c $cpuid $cmd -p > $logdir/client.$i.log 2>&1 &"
+	  command="cat ~/specpaxos/scripts/passwd | sudo -S renice -999 \$BASHPID && taskset -c $cpuid $cmd -p > $logdir/client.$i.log 2>&1 &"
   else 
-	  command="cat ~/specpaxos/scripts/passwd | sudo -S renice -999 $BASHPID && taskset -c $cpuid $cmd > $logdir/client.$i.log 2>&1 &"
+	  command="cat ~/specpaxos/scripts/passwd | sudo -S renice -999 \$BASHPID && taskset -c $cpuid $cmd > $logdir/client.$i.log 2>&1 &"
   fi 
   echo $command
   eval $command
