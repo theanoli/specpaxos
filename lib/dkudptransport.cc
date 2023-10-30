@@ -353,29 +353,32 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
     sockaddr_in sin = dynamic_cast<const DKUDPTransportAddress &>(dst).addr;
 
     // Serialize message
-    Notice("Preparing to serialize message");
+    Notice("Preparing to serialize message %s", m.SerializeAsString().c_str());
     char *buf;
     size_t msgLen = SerializeMessage(m, &buf);
     Notice("Serialized");
 
 	// We should be able to send each message as a single SGA no matter the size...?
     demi_sgarray_t sga = demi_sgaalloc(msgLen);
-    sga.sga_numsegs = 1;
-	memcpy(sga.sga_segs[0].sgaseg_buf, buf, msgLen);
-
-    Notice("Sending message %s to node, length is %d", buf, msgLen);
+    memcpy(sga.sga_segs[0].sgaseg_buf, buf, msgLen);
 
     int qd = qds[src];
     [[maybe_unused]] int ret; 
-    demi_qtoken_t t;
-    demi_qresult_t wait_out;
-	ret = demi_pushto(&t, qd, &sga, (const struct sockaddr *)&sin, sizeof(sin));
-	ASSERT(ret == 0);
-	ret = demi_wait(&wait_out, t, NULL);  // Waits for push to complete
-	ASSERT(ret == 0);
-	ASSERT(wait_out.qr_opcode == DEMI_OPC_PUSH);
-
-	demi_sgafree(&sga);
+    demi_qtoken_t t = -1;
+    demi_qresult_t wait_out = {}; 
+    ret = demi_pushto(&t, qd, &sga, (const struct sockaddr *)&sin, sizeof(sin));
+    if (ret != 0) {
+	Panic("Problem pushing to demiqueue");	    
+    }
+    ret = demi_wait(&wait_out, t, NULL);  // Waits for push to complete
+    if (ret != 0) {
+	Panic("Problem waiting for push to complete");	    
+    }
+    if (wait_out.qr_opcode != DEMI_OPC_PUSH) {
+	Panic("Something weird---got wrong return opcode!");
+    }
+    
+    demi_sgafree(&sga);
 
     delete [] buf;
     return true;
@@ -646,7 +649,7 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
     
     // if we got an EOK back from wait
     if (status == 0) {
-        Debug("Found something: qd=%d", wait_out.qr_qd);
+        Notice("Found something: qd=%d", wait_out.qr_qd);
 	// process request
 	demi_sgarray_t &sga = wait_out.qr_value.sga;
 	assert(sga.sga_numsegs > 0);
