@@ -363,7 +363,7 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
     sga.sga_numsegs = 1;
 	memcpy(sga.sga_segs[0].sgaseg_buf, buf, msgLen);
 
-    Notice("Sending message to node %s, length is %d", buf, msgLen);
+    Notice("Sending message %s to node, length is %d", buf, msgLen);
 
     int qd = qds[src];
     [[maybe_unused]] int ret; 
@@ -431,6 +431,7 @@ void
 DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
 {
 	// int qd = qr.qr_qd;
+	Notice("Got something to read!");
 	demi_sgarray_t *sga = &qr.qr_value.sga;
 	ASSERT(sga->sga_numsegs > 0); 
     
