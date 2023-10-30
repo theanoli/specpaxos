@@ -39,9 +39,8 @@ message PrepareMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;
     required uint64 batchstart = 3;
-	required uint64 cleanUpTo = 4;
-	required uint64 lastCommitted = 5;
-    repeated Request request = 6;
+    repeated Request request = 4;
+	required uint64 cleanUpTo = 5;
 }
 
 message PrepareOKMessage {
