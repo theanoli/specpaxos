@@ -54,6 +54,7 @@ VRWClient::VRWClient(const Configuration &config,
     unloggedRequestTimeout = new Timeout(transport, 1000, [this]() {
             UnloggedRequestTimeoutCallback();
         });
+    Notice("Beehive serialization: %d", USE_BEEHIVE);
 }
 
 VRWClient::~VRWClient()
