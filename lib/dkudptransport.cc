@@ -230,58 +230,16 @@ DKUDPTransport::Register(TransportReceiver *receiver,
         PPanic("Failed to create socket to listen");
     }
 
-    /*
-    // Put it in non-blocking mode
-    if (fcntl(qd, F_SETFL, O_NONBLOCK, 1)) {
-        PWarning("Failed to set O_NONBLOCK");
-    }
-    */
-
-    // TODO how do we do this? 
-    // Enable outgoing broadcast traffic
-	/*
-    int n = 1;
-    if (setsockopt(qd, SOL_SOCKET,
-                   SO_BROADCAST, (char *)&n, sizeof(n)) < 0) {
-        PWarning("Failed to set SO_BROADCAST on socket");
-    }
-	*/
-
-    // TODO check whether we should ignore this...
-    /*
-    if (dscp != 0) {
-        n = dscp << 2;
-        if (setsockopt(qd, IPPROTO_IP,
-                       IP_TOS, (char *)&n, sizeof(n)) < 0) {
-            PWarning("Failed to set DSCP on socket");
-        }
-    }
-    */
-    
-    // Increase buffer size
-    // TODO how? 
-    /*
-    n = SOCKET_BUF_SIZE;
-    if (setsockopt(qd, SOL_SOCKET,
-                   SO_RCVBUF, (char *)&n, sizeof(n)) < 0) {
-        PWarning("Failed to set SO_RCVBUF on socket");
-    }
-    if (setsockopt(qd, SOL_SOCKET,
-                   SO_SNDBUF, (char *)&n, sizeof(n)) < 0) {
-        PWarning("Failed to set SO_SNDBUF on socket");
-    }
-    */
-
     string host;
     string port;
     
     if (replicaIdx != -1) {
-        // Registering a replica. Bind socket to the designated
+        // Registering a replica.
         // host/port
         host = config.replica(replicaIdx).host;
         port = config.replica(replicaIdx).port;
     } else {
-        // Registering a client. Bind to any available host/port
+        // Registering a client.
 	host = config.client().host;
 	port = config.client().port;
     }
@@ -353,7 +311,8 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
     sockaddr_in sin = dynamic_cast<const DKUDPTransportAddress &>(dst).addr;
 
     // Serialize message
-    Notice("Preparing to serialize message %s", m.SerializeAsString().c_str());
+    Notice("Preparing to seralize message to %s:%d (input: %s:%s)", 
+		    inet_ntoa(sin.sin_addr), htons(sin.sin_port));
     char *buf;
     size_t msgLen = SerializeMessage(m, &buf);
     Notice("Serialized");
@@ -402,7 +361,6 @@ DKUDPTransport::Run()
     DemiTimer(1);
 
     Notice("Dispatching the libevent base.");
-	// Timer callbacks will trigger here. 
     event_base_dispatch(libeventBase);
     Notice("Exited the libevent loop!");
 }
@@ -626,7 +584,7 @@ DKUDPTransport::OnDemiTimer(DKUDPTransportTimerInfo *info)
     
     CheckQdCallback(info->transport);
 
-    DemiTimer(1);
+    info->transport->DemiTimer(1);
 
     delete info;
 }
@@ -657,8 +615,11 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 	status = demi_pop(&token, wait_out.qr_qd);
         if (status == 0) {
             transport->tokens[ready_idx] = token;
-        } 
-    } else if (status != 0 && status != ETIMEDOUT)  {
+	    return;
+        }
+    }
+
+    if (status != 0 && status != ETIMEDOUT)  {
         Warning("Something went wrong---not resetting the timer");
 	FatalCallback(status);  // Maybe not the right input to FatalCallback... 
     }
