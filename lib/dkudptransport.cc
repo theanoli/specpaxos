@@ -638,13 +638,12 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 {
     struct timespec ts; 
     ts.tv_sec = 0; 
-    ts.tv_nsec = 1000;  // TODO set this properly? Is setting to 0 OK? 
+    ts.tv_nsec = 5000;  // TODO set this properly? Is setting to 0 OK? 
     
 	int status = -1;
     demi_qresult_t wait_out = {};
-	int ready_idx;
+	int ready_idx = -1;
     demi_qtoken_t token = -1;
-    Notice("Waiting on %d tokens", transport->tokens.size());
     status = demi_wait_any(&wait_out, &ready_idx, 
 		    transport->tokens.data(), transport->tokens.size(), &ts);
     
@@ -656,16 +655,13 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 	assert(sga.sga_numsegs > 0);
 	transport->OnReadable(wait_out, transport->receivers[wait_out.qr_qd]);
 	status = demi_pop(&token, wait_out.qr_qd);
-    }
-    
-    if (status > 0 && status != ETIMEDOUT)  {
+        if (status == 0) {
+            transport->tokens[ready_idx] = token;
+        } 
+    } else if (status != 0 && status != ETIMEDOUT)  {
         Warning("Something went wrong---not resetting the timer");
-		FatalCallback(status);  // Maybe not the right input to FatalCallback... 
+	FatalCallback(status);  // Maybe not the right input to FatalCallback... 
     }
-
-    if (status == 0) {
-        transport->tokens[ready_idx] = token;
-    } 
 }
 
 void
