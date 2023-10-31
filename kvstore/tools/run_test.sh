@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [ $# -ne 3 ]; then 
-    echo "Wrong number of arguments! Need three: do_read_val nclient_machines nclient_threads"
+if [ $# -ne 4 ]; then 
+    echo "Wrong number of arguments! Need four: config_dir do_read_val nclient_machines nclient_threads"
     exit
 fi
 
@@ -29,12 +29,15 @@ trap 'failure ${LINENO} "$BASH_COMMAND"' ERR
 
 # Paths to source code and logfiles.
 srcdir="$HOME/specpaxos"
-configdir="$srcdir/kvstore/configs/100gb_cluster"
+#configdir="$srcdir/kvstore/configs/100gb_cluster"
+configdir=`realpath "$1"`
 logdir="$HOME/specpaxos/logs"
 keyspath="$HOME/specpaxos/kvstore/tools/keys"
 
 # Machines on which replicas are running.
-replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")  # 100gb
+# replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")  # 100gb
+# replicas=("198.0.0.5" "198.0.0.9" "198.0.0.13")  # 100gb-fpga
+replicas=$(cat "$configdir"/shard0.config | tail -n+2 | cut -d' ' -f2 | cut -d':' -f1)
 # replicas=("10.100.1.16" "10.100.1.14" "10.100.1.13")
 # replicas=("localhost" "localhost" "localhost")
 
@@ -47,9 +50,9 @@ clients=("198.0.0.1" "198.0.0.11")  # 100gb
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
 
-validate_reads=$1
-nclients=$2  # number of client machines to use
-nclient_threads=$3    # number of clients to run (per machine)
+validate_reads=$2
+nclients=$3  # number of client machines to use
+nclient_threads=$4    # number of clients to run (per machine)
 nclient_procs=$((nclients * nclient_threads))
 nshard=1     # number of shards
 nkeys=1000 # number of keys to use

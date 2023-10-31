@@ -9,12 +9,14 @@ CHECK_READS=$3
 CLIENT_DEVICES=$4
 THREADS=$5
 
+config_base=$(basename "$CONFIG")
+
 #og_logdir="$HOME/specpaxos/logs"
 
 rm -rf ../../logs
 mkdir -p ../../logs
 
-logdir=logs,$CONFIG,$VERSION
+logdir=logs,$config_base,$VERSION
 
 mkdir -p $logdir
 
@@ -33,7 +35,7 @@ done
 
 date > $logdir/$destfile,$runNum,.stdout
 
-./run_test.sh $CHECK_READS $CLIENT_DEVICES $THREADS
+./run_test.sh $CONFIG $CHECK_READS $CLIENT_DEVICES $THREADS
 
 mv ../../logs/client.log $logdir/$destfile,$runNum,.us
 cat ../../logs/* > $logdir/$destfile,$runNum,.stderr
