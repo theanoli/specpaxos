@@ -1,6 +1,6 @@
 import matplotlib
 
-matplotlib.use('tkagg')
+#matplotlib.use('tkagg')
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -191,6 +191,7 @@ def main():
     time_ran = sys.argv[3]
     #payload_size = sys.argv[5]
     warmup_period = sys.argv[4]
+    output_to_file = len(sys.argv) == 6
 
 
     data = get_raw_data({'config': config, 'version': version, 'time_ran': time_ran, 'warmup_period': warmup_period})
@@ -206,8 +207,11 @@ def main():
         #print(data)
         graph(data, 'num_threads', 'average thruput', lambda x: x['payload_size'],
                     'Num Clients', 'Throughput (MB/s)', 'Payload Size (B)')
-        graph(data, 'payload_size', 'average thruput', lambda x: x['num_threads'],
-                    'Payload Size (B)', 'Throughput (MB/s)', 'Num Clients')
+        #graph(data, 'payload_size', 'average thruput', lambda x: x['num_threads'],
+                    #'Payload Size (B)', 'Throughput (MB/s)', 'Num Clients')
+    if output_to_file:
+        plt.savefig(f'graphs/{config},{version},.png')
+    else:
         plt.show()
 
 if __name__ == '__main__':
