@@ -311,7 +311,7 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
     sockaddr_in sin = dynamic_cast<const DKUDPTransportAddress &>(dst).addr;
 
     // Serialize message
-    Notice("Preparing to seralize message to %s:%d (input: %s:%s)", 
+    Notice("Preparing to seralize message to %s:%d", 
 		    inet_ntoa(sin.sin_addr), htons(sin.sin_port));
     char *buf;
     size_t msgLen = SerializeMessage(m, &buf);
@@ -392,7 +392,6 @@ void
 DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
 {
 	// int qd = qr.qr_qd;
-	Notice("Got something to read!");
 	demi_sgarray_t *sga = &qr.qr_value.sga;
 	ASSERT(sga->sga_numsegs > 0); 
     
@@ -403,6 +402,8 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
         char *buf = (char *)seg->sgaseg_buf;
         
         DKUDPTransportAddress senderAddr(sga->sga_addr);
+	Notice("Got something to read from %s:%d!",
+		    inet_ntoa(senderAddr.addr.sin_addr), htons(senderAddr.addr.sin_port));
         string msgType, msg;
 
         // Take a peek at the first field. If it's all zeros, this is
