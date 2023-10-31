@@ -403,7 +403,7 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
         
         DKUDPTransportAddress senderAddr(sga->sga_addr);
 	Notice("Got something to read from %s:%d!",
-		    inet_ntoa(senderAddr.addr.sin_addr), htons(senderAddr.addr.sin_port));
+		    inet_ntoa(senderAddr.addr.sin_addr), ntohs(senderAddr.addr.sin_port));
         string msgType, msg;
 
         // Take a peek at the first field. If it's all zeros, this is
