@@ -204,8 +204,8 @@ def main():
 
     data = get_raw_data({'config': config, 'version': version})
     #print(data)
-    graph(data, 'average latency', 'total thruput', lambda x: f"{x['threads_per_client']:>03}",
-                'Average Latency (us)', 'Throughput (ops/s)', 'Threads per client')
+    graph(data, 'total thruput', 'average latency', lambda x: f"{x['threads_per_client']:>03}",
+                'Throughput (ops/s)', 'Average Latency (us)', 'Threads per client')
     plt.show()
 
 if __name__ == '__main__':

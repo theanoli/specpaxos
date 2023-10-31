@@ -2,9 +2,11 @@
 REPO_ROOT=$(git rev-parse --show-toplevel)
 CONFIG_DIR="${REPO_ROOT}/scripts"
 
-BEEHIVE_REPO_ROOT="/home/katie/apiary/beehive"
-BEEHIVE_SCRIPTS="/home/katie/apiary/beehive/util/scripts"
-CORUNDUM_SCRIPTS="/home/katie/apiary/beehive/corundum_fpga/fpga/lib/pcie/scripts"
+USERN=mgiordan
+
+BEEHIVE_REPO_ROOT="/home/$USERN/beehive"
+BEEHIVE_SCRIPTS="/home/$USERN/beehive/util/scripts"
+CORUNDUM_SCRIPTS="/home/$USERN/beehive/corundum_fpga/fpga/lib/pcie/scripts"
 
 SUDO_PASSWD_FILE="${REPO_ROOT}/scripts/passwd"
 

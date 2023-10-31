@@ -24,9 +24,9 @@ do
     #fpga_ip_index_map["${server}"]=${REPLICA_INDEX}
     # do fpga path
     index=$i
-    local my_ip=$(ip route get ${server} | head -n 1 | sed 's/.*src //' | cut -d " " -f 1)
-    command="${BEEHIVE_SCRIPTS}/reset_fpga_remote.sh ${SUDO_PASSWD_FILE} fpga_${index}_reset ${CORUNDUM_SCRIPTS} ${FPGA_IP_PCIE[${server}]} ${server} && \
-             python3 ${BEEHIVE_SCRIPTS}/beehive_vr_witness_setup.py --rep_index ${index} --witness_addr ${server} --witness_port 52001 --src_addr ${my_ip} --src_port 53212"
+    my_ip=$(ip route get ${server} | head -n 1 | sed 's/.*src //' | cut -d " " -f 1)
+    command="${BEEHIVE_SCRIPTS}/reset_fpga_remote.sh ${SUDO_PASSWD_FILE} fpga_${index}_reset ${CORUNDUM_SCRIPTS} ${FPGA_IP_PCIE[${server}]} ${server} && sleep 5 && \
+             python3 ${BEEHIVE_SCRIPTS}/beehive_vr_witness_setup.py --rep_index ${index} --witness_addr ${server} --witness_port 52001 --src_addr ${my_ip} --src_port 53212 && sleep 5"
   else
     #cpu_index_ip_map["${REPLICA_INDEX}"]="${HOST_IP}"
     #echo "${REPLICA_INDEX}"
