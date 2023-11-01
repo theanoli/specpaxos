@@ -401,7 +401,9 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
         ssize_t sz = seg->sgaseg_len;
         char *buf = (char *)seg->sgaseg_buf;
         
-        DKUDPTransportAddress senderAddr(sga->sga_addr);
+	struct sockaddr_in src = sga->sga_addr;
+	src.sin_port = ntohs(src.sin_port);
+        DKUDPTransportAddress senderAddr(src);
 	Notice("Got something to read from %s:%d!",
 		    inet_ntoa(senderAddr.addr.sin_addr), ntohs(senderAddr.addr.sin_port));
         string msgType, msg;
