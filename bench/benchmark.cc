@@ -46,14 +46,15 @@ namespace specpaxos {
 DEFINE_LATENCY(op);
 
 BenchmarkClient::BenchmarkClient(Client &client, Transport &transport,
-                                 int numRequests, uint64_t delay,
+                                 uint64_t numRequests, uint64_t delay,
                                  int warmupSec,
                                  uint64_t payload_size,
+				 bool requestsAreTimeNotReqs,
                                  string latencyFilename
                                 )
     : client(client), transport(transport),
       numRequests(numRequests), delay(delay),
-      warmupSec(warmupSec), latencyFilename(latencyFilename), payload_size(payload_size)
+      warmupSec(warmupSec), latencyFilename(latencyFilename), requestsAreTimeNotReqs(requestsAreTimeNotReqs), payload_size(payload_size)
 {
     if (delay != 0) {
         Notice("Delay between requests: %" PRIu64 " ms", delay);        
@@ -62,7 +63,9 @@ BenchmarkClient::BenchmarkClient(Client &client, Transport &transport,
     done = false;
     cooldownDone = false;
     _Latency_Init(&latency, "op");
-    latencies.reserve(numRequests);
+    if (!requestsAreTimeNotReqs) {
+	    latencies.reserve(numRequests);
+    }
 }
 
 void
@@ -79,10 +82,12 @@ void
 BenchmarkClient::WarmupDone()
 {
     started = true;
-    Notice("Completed warmup period of %d seconds with %d requests",
+    Notice("Completed warmup period of %d seconds with %ld requests",
            warmupSec, n);
     gettimeofday(&startTime, NULL);
     n = 0;
+    totalTime = 0;
+    realNumReqs = 0;
 }
 
 void
@@ -118,13 +123,21 @@ BenchmarkClient::OnReply(const string &request, const string &reply)
     if (cooldownDone) {
         return;
     }
-    
+
     if ((started) && (!done) && (n != 0)) {
         uint64_t ns = Latency_End(&latency);
+	realNumReqs++;
         latencies.push_back(ns);
-        if (n > numRequests) {
-            Finish();
-        }
+	if (requestsAreTimeNotReqs) {
+	    if (/*ns */totalTime > numRequests) {
+		Finish();
+	    }
+	} else {
+            if (n > numRequests) {
+                Finish();
+            }
+	}
+	totalTime += ns;
     }
     
     n++;
@@ -144,8 +157,8 @@ BenchmarkClient::Finish()
     
     struct timeval diff = timeval_sub(endTime, startTime);
 
-    Notice("Completed %d requests in " FMT_TIMEVAL_DIFF " seconds",
-           numRequests, VA_TIMEVAL_DIFF(diff));
+    Notice("Completed %ld requests in " FMT_TIMEVAL_DIFF " seconds",
+           realNumReqs, VA_TIMEVAL_DIFF(diff));
     done = true;
 
     transport.Timer(warmupSec * 1000,

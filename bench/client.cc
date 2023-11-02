@@ -48,7 +48,7 @@
 static void
 Usage(const char *progName)
 {
-        fprintf(stderr, "usage: %s [-n requests] [-t threads] [] [-w warmup-secs] [-l latency-file] [-q dscp] [-d delay-ms] -c conf-file -m unreplicated|vr|vrw|fastpaxos|spec\n",
+        fprintf(stderr, "usage: %s [-n requests] [-t threads] [] [-w warmup-secs] [-l latency-file] [-q dscp] [-d delay-ms] -c conf-file -m unreplicated|vr|vrw|fastpaxos|spec [-a]\n",
                 progName);
         exit(1);
 }
@@ -63,11 +63,12 @@ int main(int argc, char **argv)
 {
     const char *configPath = NULL;
     int numClients = 1;
-    int numRequests = 100;
+    uint64_t numRequests = 100;
     int warmupSec = 0;
     int dscp = 0;
     uint64_t delay = 0;
     uint64_t payload_size = 64;
+    bool requestsAreTimeNotReqs = false;
     
     enum
     {
@@ -84,7 +85,7 @@ int main(int argc, char **argv)
 
     // Parse arguments
     int opt;
-    while ((opt = getopt(argc, argv, "c:d:f:q:l:m:n:t:w:s:")) != -1) {
+    while ((opt = getopt(argc, argv, "c:d:f:q:l:m:n:t:w:s:a")) != -1) {
         switch (opt) {
         case 'c':
             configPath = optarg;
@@ -141,10 +142,15 @@ int main(int argc, char **argv)
             }
             break;
 
+	case 'a':
+        {
+	    requestsAreTimeNotReqs = true;
+	    break;
+	}
         case 'n':
         {
             char *strtolPtr;
-            numRequests = strtoul(optarg, &strtolPtr, 10);
+            numRequests = strtoull(optarg, &strtolPtr, 10);
             if ((*optarg == '\0') || (*strtolPtr != '\0') ||
                 (numRequests <= 0))
             {
@@ -256,7 +262,7 @@ int main(int argc, char **argv)
         specpaxos::BenchmarkClient *bench =
             new specpaxos::BenchmarkClient(*client, transport,
                                            numRequests, delay,
-                                           warmupSec, payload_size);
+                                           warmupSec, payload_size, requestsAreTimeNotReqs);
 
         transport.Timer(0, [=]() { bench->Start(); });
         clients.push_back(client);
