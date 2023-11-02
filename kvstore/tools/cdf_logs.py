@@ -2,7 +2,7 @@ import re
 import sys
 import matplotlib
 
-matplotlib.use('tkagg')
+#matplotlib.use('tkagg')
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -106,4 +106,7 @@ fig, ax = plt.subplots()
 ax.plot(tLatency, 1. * np.arange(len(tLatency))/(len(tLatency) - 1))
 ax.set_xlim(left=min(tLatency), right=tLatency[int((len(tLatency) * 99)/100)])
 
-plt.show()
+if len(sys.argv) == 4:
+    plt.savefig(f'graphs/cdf,{sys.argv[3]}.png')
+else:
+    plt.show()

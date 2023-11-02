@@ -1,6 +1,6 @@
 import matplotlib
 
-matplotlib.use('tkagg')
+#matplotlib.use('tkagg')
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -136,6 +136,7 @@ def get_raw_data(supplied):
         run['num reqs'] = len(raw_data)
         run['total thruput'] = len(raw_data) / rt
         run['error'] = error
+        #"""
         if error == 'no' or error == 'maybe':
             # check for errors
             errfile = make_filename(**run, suffix=".stderr")
@@ -144,12 +145,13 @@ def get_raw_data(supplied):
                 #print(errfile)
                 #print(f)
                 errtext = mmap.mmap(f.fileno(), 0, prot=mmap.PROT_READ)
-                state_err = re.search(b'state transfer|received a duplicate message', errtext)
+                state_err = re.search(b'PANIC|state transfer|received a duplicate message', errtext)
                 if (state_err):
                     run['error'] = 'yes'
             if run['error'] == 'no':
-                if os.path.getsize(errfile) > 100000:
+                if os.path.getsize(errfile) > 1000000:
                     run['error'] = 'maybe'
+                    #"""
         #run['thread thruput'] = int(run['payload_size']) * int(run['num_reqs']) / rt # TODO: this may need to be divided by num_threads
         data.append(run)
     return data
@@ -158,7 +160,7 @@ def get_raw_data(supplied):
 def graph(data, xprop, yprop, zprop_lambda, xlabel='', ylabel='', zlabel=''):
     # Assumption: all datas have the same config and version for one graph() call
     # get all the (x, y, z, error) pairs
-    data4 = [(run[xprop], run[yprop], zprop_lambda(run), run['error']) for run in data]
+    data4 = [(run[xprop], run[yprop], zprop_lambda(run), run['error']) for run in data if run['error'] != 'yes']
     # get all unique z layers
     #zlayers = sorted(list(set(run[2] for run in data4)), key=lambda x: float(x))
     zlayers = sorted(list(set(run[2] for run in data4)), key=lambda x: float(x))
@@ -200,58 +202,17 @@ def main():
     #time_ran = sys.argv[3]
     #payload_size = sys.argv[5]
     #warmup_period = sys.argv[4]
+    output_to_file = len(sys.argv) == 4
 
 
     data = get_raw_data({'config': config, 'version': version})
     #print(data)
     graph(data, 'total thruput', 'average latency', lambda x: f"{x['threads_per_client']:>03}",
                 'Throughput (ops/s)', 'Average Latency (us)', 'Threads per client')
-    plt.show()
+    if output_to_file:
+        plt.savefig(f'graphs/{config},{version},.png')
+    else:
+        plt.show()
 
 if __name__ == '__main__':
     main()
-
-def __():
-    runtimes = defaultdict(0)
-    data = defaultdict(map)
-    flat_data = []
-
-    runs = 0
-
-    # try each run number
-
-    def get_data():
-        global data
-        global flat_data
-        global runtimes
-        global runs
-        for runNo in range(99999):
-            runtime = -1
-            for threadNo in range(int(num_threads)):
-                filename = filename_base + f",{threadNo},{runNo},.us"
-                # TODO: fail gracefully
-                path = Path(filename)
-                if not path.exists():
-                    return
-                my_data = map(int, path.read_text().strip().split("\n"))
-                runtime = max(runtime, sum(my_data))
-                #data[runNo][threadNo] = my_data
-                flat_data += my_data
-            runtimes[runNo] = runtime
-            runs += 1
-
-    get_data()
-
-
-    colors = ['aqua', 'red', 'gold', 'royalblue', 'darkorange', 'green', 'purple', 'cyan', 'yellow', 'lime']
-
-    decades = np.arange(50, 200, 10)
-    # look at ALL data
-    fig, ax = plt.subplots()
-    ax.set_xlim(0, 200)
-    cnts, values, bars = ax.hist(flat_data, edgecolor='k', bins=decades)
-    #print(flat_data)
-    for i, (cnt, value, bar) in enumerate(zip(cnts, values, bars)):
-        bar.set_facecolor(colors[i % len(colors)])
-    plt.show()
-
