@@ -50,6 +50,8 @@
 #include <netdb.h>
 #include <signal.h>
 
+#include "lib/beehive_lib.h"
+
 const size_t MAX_DKUDP_MESSAGE_SIZE = 9000; // XXX
 const int SOCKET_BUF_SIZE = 10485760;
 
@@ -260,8 +262,7 @@ DKUDPTransport::Register(TransportReceiver *receiver,
     qds[receiver] = qd;
 }
 
-static size_t
-SerializeMessage(const ::google::protobuf::Message &m, char **out)
+static size_t BaseSerializeMessage(const ::google::protobuf::Message &m, char **out)
 {
     string data = m.SerializeAsString();
     string type = m.GetTypeName();
@@ -297,6 +298,26 @@ SerializeMessage(const ::google::protobuf::Message &m, char **out)
     
     *out = buf;
     return totalLen;
+}
+
+static size_t
+SerializeMessage(const ::google::protobuf::Message &m, char **out)
+{
+    size_t result = 0;
+    if (USE_BEEHIVE == 1) {
+        //if (!CheckMessage(m)) {
+        //    Panic("Serialization returned a different message");
+        //}
+        result = SerializeMessageBeehive(m, out);
+        if (result == 0) { 
+            Panic("Fatal Beehive serialization error");
+        }
+    }
+    else {
+        result = BaseSerializeMessage(m, out);
+    }
+
+    return result;
 }
 
 bool
@@ -363,8 +384,7 @@ DKUDPTransport::Run()
 }
 
 // Helper function for OnReadable; called after a packet is read in
-static void
-DecodePacket(const char *buf, size_t sz, string &type, string &msg)
+static void BaseDecodePacket(const char *buf, size_t sz, string &type, string &msg)
 {
     [[maybe_unused]] ssize_t ssz = sz;
     const char *ptr = buf;
@@ -383,6 +403,17 @@ DecodePacket(const char *buf, size_t sz, string &type, string &msg)
     ASSERT(ptr+msgLen-buf <= ssz);
     msg = string(ptr, msgLen);
     ptr += msgLen;
+}
+
+static void
+DecodePacket(const char *buf, size_t sz, string &type, string &msg)
+{
+    if (USE_BEEHIVE == 1) {
+        DecodePacketBeehive(buf, sz, type, msg);
+    }
+    else {
+        BaseDecodePacket(buf, sz, type, msg);
+    }
 }
 
 void
