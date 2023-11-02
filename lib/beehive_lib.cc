@@ -51,6 +51,8 @@ static void hexdump_buf(const char *buf, size_t len) {
 bool CheckMessage(const Message &orig_msg) {
     static specpaxos::vrw::proto::RequestMessage request;
     static specpaxos::vrw::proto::ReplyMessage reply;
+    static specpaxos::vrw::proto::ValidateRequestMessage validate_request;
+    static specpaxos::vrw::proto::ValidateReplyMessage validate_reply;
     static specpaxos::vrw::proto::PrepareMessage prepare;
     static specpaxos::vrw::proto::PrepareOKMessage prepareOK;
     static specpaxos::vrw::proto::CommitMessage commit;
@@ -63,7 +65,7 @@ bool CheckMessage(const Message &orig_msg) {
 
     bool result = false; 
     size_t buf_len = SerializeMessageBeehive(orig_msg, &serialized_buf);
-    Debug("Total buf len is %lu\n", buf_len);
+    Debug("Total buf len is %lu", buf_len);
     if (buf_len == 0) {
         Notice("Serialization not implemented, returning without checking\n");
         return true;
@@ -71,7 +73,7 @@ bool CheckMessage(const Message &orig_msg) {
     string msgType, msg;
 
     DecodePacketBeehive(serialized_buf+sizeof(uint32_t), buf_len-sizeof(uint32_t), msgType, msg);
-    Debug("Got message type %s\n", msgType.c_str());
+    Notice("Got message type %s", msgType.c_str());
     if (msgType == request.GetTypeName()) {
         request.ParseFromString(msg);
         result = util::MessageDifferencer::Equals(request, orig_msg);
@@ -79,6 +81,14 @@ bool CheckMessage(const Message &orig_msg) {
     else if (msgType == reply.GetTypeName()) {
         reply.ParseFromString(msg);
         result = util::MessageDifferencer::Equals(reply, orig_msg);
+    }
+    else if (msgType == validate_request.GetTypeName()) {
+        validate_request.ParseFromString(msg);
+        result = util::MessageDifferencer::Equals(validate_request, orig_msg); 
+    }
+    else if (msgType == validate_reply.GetTypeName()) {
+        validate_reply.ParseFromString(msg);
+        result = util::MessageDifferencer::Equals(validate_reply, orig_msg);
     }
     else if (msgType == prepare.GetTypeName()) {
         prepare.ParseFromString(msg);
@@ -131,6 +141,8 @@ size_t SerializeMessageBeehive(const ::google::protobuf::Message &m, char **out)
     // TODO: Handle view change types
     static specpaxos::vrw::proto::RequestMessage request;
     static specpaxos::vrw::proto::ReplyMessage reply;
+    static specpaxos::vrw::proto::ValidateRequestMessage validate_request;
+    static specpaxos::vrw::proto::ValidateReplyMessage validate_reply;
     static specpaxos::vrw::proto::PrepareMessage prepare;
     static specpaxos::vrw::proto::PrepareOKMessage prepareOK;
     static specpaxos::vrw::proto::CommitMessage commit;
@@ -160,6 +172,16 @@ size_t SerializeMessageBeehive(const ::google::protobuf::Message &m, char **out)
         result_size = ToBeehiveWire(m, data_arr);
         data = data_arr;
     } 
+    else if (type == validate_request.GetTypeName()) {
+        type_enum = MsgTypeEnum::ValidateReadRequest;
+        result_size = ToBeehiveWire(m, data_arr);
+        data = data_arr;
+    }
+    else if (type == validate_reply.GetTypeName()) {
+        type_enum = MsgTypeEnum::ValidateReadReply;
+        result_size = ToBeehiveWire(m, data_arr);
+        data = data_arr;
+    }
     else if (type == commit.GetTypeName()) {
         type_enum = MsgTypeEnum::Commit;
         result_size = ToBeehiveWire(m, data_arr);
@@ -371,6 +393,13 @@ static size_t ToBeehiveWire(const ::google::protobuf::Message &m, char *out) {
                         curr_ptr += ToBeehiveWire(inner_msg, curr_ptr);
                         break;
                     }
+                    case FieldDescriptor::TYPE_BOOL: {
+                        uint8_t bool_value = (uint8_t)(refl->GetBool(m, field_desc));
+                        Debug("Bool value is %hhu", bool_value);
+                        curr_ptr[0] = bool_value;
+                        curr_ptr += sizeof(uint8_t);
+                        break;
+                    }
                     case FieldDescriptor::TYPE_UINT64: {
                         uint64_t field_value = refl->GetRepeatedUInt64(m, field_desc, rep_index);
                         Debug("Field value is %lu\n", field_value);
@@ -406,6 +435,13 @@ static size_t ToBeehiveWire(const ::google::protobuf::Message &m, char *out) {
                 case FieldDescriptor::TYPE_MESSAGE: {
                     const Message &inner_msg = refl->GetMessage(m, field_desc);
                     curr_ptr += ToBeehiveWire(inner_msg, curr_ptr);
+                    break;
+                }
+                case FieldDescriptor::TYPE_BOOL: {
+                    uint8_t bool_value = (uint8_t)(refl->GetBool(m, field_desc));
+                    Debug("Bool value is %hhu", bool_value);
+                    curr_ptr[0] = bool_value;
+                    curr_ptr += sizeof(uint8_t);
                     break;
                 }
                 case FieldDescriptor::TYPE_UINT64: {
@@ -466,6 +502,10 @@ static size_t get_beehive_wire_size(const Message &m) {
                     }
                     break;
                 }
+                case FieldDescriptor::TYPE_BOOL: {
+                    msg_size += (sizeof(uint8_t) * field_count);
+                    break;
+                }
                 case FieldDescriptor::TYPE_UINT64: {
                     msg_size += (sizeof(uint64_t) * field_count);
                     break;
@@ -494,6 +534,10 @@ static size_t get_beehive_wire_size(const Message &m) {
                 case FieldDescriptor::TYPE_MESSAGE: {
                     const Message &inner_msg = refl->GetMessage(m, field);
                     msg_size += get_beehive_wire_size(inner_msg);
+                    break;
+                }
+                case FieldDescriptor::TYPE_BOOL: {
+                    msg_size += sizeof(uint8_t);
                     break;
                 }
                 case FieldDescriptor::TYPE_UINT64: {
@@ -526,6 +570,8 @@ void DecodePacketBeehive(const char *buf, size_t sz, string &type, string &msg) 
     // grab the type enum
     static specpaxos::vrw::proto::RequestMessage request;
     static specpaxos::vrw::proto::ReplyMessage reply;
+    static specpaxos::vrw::proto::ValidateRequestMessage validate_request;
+    static specpaxos::vrw::proto::ValidateReplyMessage validate_reply;
     static specpaxos::vrw::proto::PrepareMessage prepare;
     static specpaxos::vrw::proto::PrepareOKMessage prepareOK;
     static specpaxos::vrw::proto::CommitMessage commit;
@@ -557,6 +603,20 @@ void DecodePacketBeehive(const char *buf, size_t sz, string &type, string &msg) 
             msg = string(rd_ptr, data_len);
             rd_ptr += data_len;
             msg_used = &reply;
+            break;
+        }
+        case (MsgTypeEnum::ValidateReadRequest): {
+            type = validate_request.GetTypeName();
+            rd_ptr = FromBeehiveWire(&validate_request, rd_ptr);
+            msg = validate_request.SerializeAsString();
+            msg_used = &validate_request;
+            break;
+        }
+        case (MsgTypeEnum::ValidateReadReply): {
+            type = validate_reply.GetTypeName();
+            rd_ptr = FromBeehiveWire(&validate_reply, rd_ptr);
+            msg = validate_reply.SerializeAsString(); 
+            msg_used = &validate_reply;
             break;
         }
         case (MsgTypeEnum::Prepare): {
@@ -671,6 +731,12 @@ static const char * FromBeehiveWire(Message *msg, const char *buf) {
                         rd_ptr = FromBeehiveWire(inner_msg, rd_ptr);
                         break;
                     }
+                    case FieldDescriptor::TYPE_BOOL: {
+                        bool bool_val = (bool)(rd_ptr[0]);
+                        refl->SetBool(msg, field_desc, bool_val);
+                        rd_ptr += sizeof(uint8_t);
+                        break;
+                    }
                     case FieldDescriptor::TYPE_UINT64: {
                         uint64_t field_val = read_u64_be(rd_ptr);
                         refl->AddUInt64(msg, field_desc, field_val);
@@ -709,6 +775,12 @@ static const char * FromBeehiveWire(Message *msg, const char *buf) {
                 case FieldDescriptor::TYPE_MESSAGE: {
                     Message *inner_msg = refl->MutableMessage(msg, field_desc);
                     rd_ptr = FromBeehiveWire(inner_msg, rd_ptr);
+                    break;
+                }
+                case FieldDescriptor::TYPE_BOOL: {
+                    bool bool_val = (bool)(rd_ptr[0]);
+                    refl->SetBool(msg, field_desc, bool_val);
+                    rd_ptr += sizeof(uint8_t);
                     break;
                 }
                 case FieldDescriptor::TYPE_UINT64: {
