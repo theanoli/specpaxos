@@ -70,6 +70,7 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
       recoveryResponseQuorum(config.QuorumSize()),
       validateReadQuorum(config.QuorumSize()-1)
 {
+    Notice("Beehive serialization (R): %d", USE_BEEHIVE);
     this->status = STATUS_NORMAL;
     this->view = 0;
     this->lastOp = 0;

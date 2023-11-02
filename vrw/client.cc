@@ -44,6 +44,7 @@ VRWClient::VRWClient(const Configuration &config,
                    uint64_t clientid)
     : Client(config, transport, clientid)
 {
+    Notice("Beehive serialization (C): %d", USE_BEEHIVE);
     pendingRequest = NULL;
     pendingUnloggedRequest = NULL;
     lastReqId = 0;
@@ -54,7 +55,6 @@ VRWClient::VRWClient(const Configuration &config,
     unloggedRequestTimeout = new Timeout(transport, 1000, [this]() {
             UnloggedRequestTimeoutCallback();
         });
-    Notice("Beehive serialization: %d", USE_BEEHIVE);
 }
 
 VRWClient::~VRWClient()

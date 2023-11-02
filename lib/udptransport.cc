@@ -399,20 +399,25 @@ static size_t BaseSerializeMessage (const ::google::protobuf::Message &m, char *
                        dataLen + sizeof(dataLen));
 
     char *buf = new char[totalLen];
-    
     char *ptr = buf;
+
     *(uint32_t *)ptr = NONFRAG_MAGIC;
     ptr += sizeof(uint32_t);
+
     *((size_t *) ptr) = typeLen;
     ptr += sizeof(size_t);
     ASSERT(ptr-buf < totalLen);
+
     ASSERT(ptr+typeLen-buf < totalLen);
+
     memcpy(ptr, type.c_str(), typeLen);
     ptr += typeLen;
     *((size_t *) ptr) = dataLen;
     ptr += sizeof(size_t);
+
     ASSERT(ptr-buf < totalLen);
     ASSERT(ptr+dataLen-buf == totalLen);
+
     memcpy(ptr, data.c_str(), dataLen);
     ptr += dataLen;
     
