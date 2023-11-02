@@ -27,13 +27,24 @@ do
     my_ip=$(ip route get ${server} | head -n 1 | sed 's/.*src //' | cut -d " " -f 1)
     command="${BEEHIVE_SCRIPTS}/reset_fpga_remote.sh ${SUDO_PASSWD_FILE} fpga_${index}_reset ${CORUNDUM_SCRIPTS} ${FPGA_IP_PCIE[${server}]} ${server} && sleep 5 && \
              python3 ${BEEHIVE_SCRIPTS}/beehive_vr_witness_setup.py --rep_index ${index} --witness_addr ${server} --witness_port 52001 --src_addr ${my_ip} --src_port 53212 && sleep 5"
-  else
-    #cpu_index_ip_map["${REPLICA_INDEX}"]="${HOST_IP}"
-    #echo "${REPLICA_INDEX}"
-    # do cpu path
-    command="ssh $server \"cat ~/specpaxos/scripts/passwd | sudo -S renice -999 \\$\\$ && cat ~/specpaxos/scripts/passwd | sudo -S taskset -c 0 $cmd -c $config -i $i\" > $logdir/$shard.replica$i.log 2>&1 &"
+    echo $command
+    eval $command
+    echo "Done with replica $i"
   fi
-  echo $command
-  eval $command
-  echo "Done with replica $i"
+done
+
+for ((i=0; i<$n; i++))
+do
+  let line=$i+2 
+  server=$(cat $config | sed -n ${line}p | awk -F'[ :]' '{print $2}')
+
+  if [[ -n "${FPGA_IP_PCIE[${server}]}" ]]; then
+    true
+  else
+    command="ssh $server \"cat ~/specpaxos/scripts/passwd | sudo -S renice -999 \\$\\$ && cat ~/specpaxos/scripts/passwd | sudo -S taskset -c 0 $cmd -c $config -i $i\" > $logdir/$shard.replica$i.log 2>&1 &"
+    echo $command
+    eval $command
+    sleep 1
+    echo "Done with replica $i"
+  fi
 done
