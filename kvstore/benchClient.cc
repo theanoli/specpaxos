@@ -26,10 +26,9 @@ main(int argc, char **argv)
     const char *keysPath = NULL;
     int duration = 10;
     int nShards = 1;
-    int wPer = 50; // Out of 100
-    int skew = 0; // difference between real clock and TrueTime
+    int writePercentage = 50; // Out of 100
     int error = 0; // error bars
-	bool populate = false;
+    bool populate = false;
 
     vector<string> keys;
     string key, value;
@@ -37,7 +36,7 @@ main(int argc, char **argv)
     kvstore::Proto mode = kvstore::PROTO_UNKNOWN;
 
     int opt;
-    while ((opt = getopt(argc, argv, "c:d:N:l:w:k:f:m:e:s:p")) != -1) {
+    while ((opt = getopt(argc, argv, "z:c:d:N:l:w:k:f:m:e:p")) != -1) {
         switch (opt) {
         case 'c': // Configuration path
         { 
@@ -45,12 +44,12 @@ main(int argc, char **argv)
             break;
         }
 
-		case 'p': 
-		{
-			fprintf(stdout, "I am populating the kvstore!\n");
-			populate = true;
-			break;
-		}
+	case 'p': 
+	{
+		fprintf(stdout, "I am populating the kvstore!\n");
+		populate = true;
+		break;
+	}
 
         case 'f': // Generated keys path
         { 
@@ -83,9 +82,9 @@ main(int argc, char **argv)
         case 'w': // Percentage of writes (out of 100)
         {
             char *strtolPtr;
-            wPer = strtoul(optarg, &strtolPtr, 10);
+            writePercentage = strtoul(optarg, &strtolPtr, 10);
             if ((*optarg == '\0') || (*strtolPtr != '\0') ||
-                (wPer < 0 || wPer > 100)) {
+                (writePercentage < 0 || writePercentage > 100)) {
                 fprintf(stderr, "option -w requires a arg b/w 0-100\n");
             }
             break;
@@ -98,17 +97,6 @@ main(int argc, char **argv)
             if ((*optarg == '\0') || (*strtolPtr != '\0') ||
                 (nKeys <= 0)) {
                 fprintf(stderr, "option -k requires a numeric arg\n");
-            }
-            break;
-        }
-        case 's':
-        {
-            char *strtolPtr;
-            skew = strtoul(optarg, &strtolPtr, 10);
-            if ((*optarg == '\0') || (*strtolPtr != '\0') || (skew < 0))
-            {
-                fprintf(stderr,
-                        "option -s requires a numeric arg\n");
             }
             break;
         }
@@ -165,9 +153,6 @@ main(int argc, char **argv)
     kvstore::Client client(mode, configPath, nShards);
 
     // Read in the keys from a file and populate the key-value store.
-	// TS the key-value store is never actually populated here. Any GETs of keys
-	// not previously PUT are going to fail. But we probably shouldn't PUT all the
-	// keys here, because there may be many clients starting up. 
     ifstream in;
     in.open(keysPath);
     if (!in) {
@@ -181,7 +166,7 @@ main(int argc, char **argv)
 			client.Put(key, key);
 		}
     }
-	fprintf(stdout, "Done populating the kvstore...\n");
+    fprintf(stdout, "Done populating the kvstore...\n");
     in.close();
 
     
@@ -203,7 +188,7 @@ main(int argc, char **argv)
 
 		key = keys[rand_key()];
 
-		if (rand() % 100 < wPer) {
+		if (rand() % 100 < writePercentage) {
 			gettimeofday(&t2, NULL);
 			client.Put(key, key);
 			gettimeofday(&t3, NULL);

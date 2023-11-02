@@ -98,6 +98,8 @@ private:
     
     void HandlePrepare(const TransportAddress &remote,
                        const proto::PrepareMessage &msg);
+	void HandleValidateRequest(const TransportAddress &remote, 
+						const proto::ValidateRequestMessage &msg);
     void HandleCommit(const TransportAddress &remote,
                       const proto::CommitMessage &msg);
     void HandleRequestStateTransfer(const TransportAddress &remote,

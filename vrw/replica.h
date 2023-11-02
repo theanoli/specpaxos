@@ -46,6 +46,37 @@
 namespace specpaxos {
 namespace vrw {
 
+// Want a custom function here, since we can end validation on receiving a NACK from 
+// a replica (i.e., saying the leader is not the current leader)
+class ValidateQuorumSet : public QuorumSet<std::pair<uint64_t, uint64_t>, proto::ValidateReplyMessage>
+{
+public: 
+	ValidateQuorumSet(int numRequired) : QuorumSet<std::pair<uint64_t, uint64_t>, proto::ValidateReplyMessage>(numRequired) {}
+
+    const std::map<int, proto::ValidateReplyMessage> *
+    AddAndCheckForQuorumOrNack(std::pair<uint64_t, uint64_t> vs, int replicaIdx, const proto::ValidateReplyMessage &msg)
+    {
+        std::map<int, proto::ValidateReplyMessage> &vsmessages = messages[vs];
+        if (vsmessages.find(replicaIdx) != vsmessages.end()) {
+            // This is a duplicate message
+
+            // But we'll ignore that, replace the old message from
+            // this replica, and proceed.
+            //
+            // XXX Is this the right thing to do? It is for
+            // speculative replies in SpecPaxos...
+        }
+
+        vsmessages[replicaIdx] = msg;
+        
+		if (!msg.isvalid()) {
+			return &vsmessages;
+		}
+
+        return CheckForQuorum(vs);
+    }
+};
+
 class VRWReplica : public Replica
 {
 public:
@@ -68,6 +99,7 @@ private:
     std::list<std::pair<TransportAddress *,
                         proto::PrepareMessage> > pendingPrepares;
     proto::PrepareMessage lastPrepare;
+	proto::ValidateRequestMessage lastValidate;
     int batchSize;
     opnum_t lastBatchEnd;
     bool batchComplete;
@@ -80,6 +112,7 @@ private:
     std::map<uint64_t, std::unique_ptr<TransportAddress> > clientAddresses;
     struct ClientTableEntry
     {
+		view_t needsReadValidation;  // only needed for validated reads
         uint64_t lastReqId;
         bool replied;
         proto::ReplyMessage reply;
@@ -90,11 +123,15 @@ private:
     QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
     QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
     QuorumSet<uint64_t, proto::RecoveryResponseMessage> recoveryResponseQuorum;
+	
+	// Key is std::pair<clientid, clientreqid>
+    ValidateQuorumSet validateReadQuorum;
 
     Timeout *viewChangeTimeout;
     Timeout *nullCommitTimeout;
     Timeout *stateTransferTimeout;
     Timeout *resendPrepareTimeout;
+    Timeout *resendValidateTimeout;
     Timeout *closeBatchTimeout;
     Timeout *recoveryTimeout;
 
@@ -112,6 +149,7 @@ private:
     void SendNullCommit();
     void UpdateClientTable(const Request &req);
     void ResendPrepare();
+    void ResendValidate();
     void CloseBatch();
 	opnum_t GetLowestReplicaCommit();
 	void CleanLog();
@@ -120,6 +158,11 @@ private:
                        const proto::RequestMessage &msg);
     void HandleUnloggedRequest(const TransportAddress &remote,
                                const proto::UnloggedRequestMessage &msg);
+
+    void HandleValidateRequest(const TransportAddress &remote,
+                       const proto::ValidateRequestMessage &msg);
+    void HandleValidateReply(const TransportAddress &remote,
+                         const proto::ValidateReplyMessage &msg);
     
     void HandlePrepare(const TransportAddress &remote,
                        const proto::PrepareMessage &msg);

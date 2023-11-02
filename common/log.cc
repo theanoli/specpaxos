@@ -55,7 +55,10 @@ Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
 	// 20230631-160456-5163 17417 * HandleDoViewChange (replica.cc:1069):  [0] Selected log from replica 2 with lastop=8293, entries size 4
 	// 20230631-160456-5164 17417 * Append          (log.cc:55):        About to append entry 8290, last opnum is 8293
 	// 20230631-160456-5164 17417 PANIC Append          (log.cc:59):        Assertion `vs.opnum == LastOpnum()+1' failed
-	//Notice("About to append entry " FMT_OPNUM ", last opnum is " FMT_OPNUM, vs.opnum, LastOpnum() + 1);
+	Debug("About to append entry " FMT_OPNUM ", last opnum is " FMT_OPNUM, vs.opnum, LastOpnum() + 1);
+	if (!(vs.opnum % 1000)) {
+		Notice("About to append entry " FMT_OPNUM ", log size pre-append: " FMT_OPNUM, vs.opnum, entries.size());
+	}
     if (entries.empty()) {
         ASSERT(vs.opnum == start);
     } else {
@@ -139,7 +142,7 @@ Log::RemoveAfter(opnum_t op)
         return;
     }
 
-    //Notice("Removing log entries after " FMT_OPNUM, op);
+    Debug("Removing log entries after " FMT_OPNUM, op);
 
     ASSERT(op - start < entries.size());
     entries.resize(op-start);
@@ -157,7 +160,7 @@ Log::RemoveUpTo(opnum_t op)
 
 	ASSERT(op >= start);
 
-    //Notice("Removing log entries up to " FMT_OPNUM "; start is " FMT_OPNUM, op, start);
+    Debug("Removing log entries up to " FMT_OPNUM "; start is " FMT_OPNUM, op, start);
 	ASSERT(entries.begin()->viewstamp.opnum == start);
 	while (start <= op) {
 		// Shouldn't erase uncommitted entries---everyone should have committed
@@ -169,7 +172,7 @@ Log::RemoveUpTo(opnum_t op)
 	}
 
 	ASSERT(entries.empty() || entries.begin()->viewstamp.opnum == op + 1);
-	//Notice("New log size: " FMT_OPNUM, entries.size());
+	Debug("New log size after cleaning: " FMT_OPNUM, entries.size());
 }
 
 size_t

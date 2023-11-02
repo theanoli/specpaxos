@@ -77,6 +77,7 @@ VRWClient::Invoke(const string &request,
     if (pendingRequest != NULL) {
         Panic("Client only supports one pending request");
     }
+    Debug("Request size is %lu", request.size());
 
     ++lastReqId;
     uint64_t reqId = lastReqId;
@@ -122,6 +123,7 @@ VRWClient::SendRequest()
     reqMsg.mutable_req()->set_op(pendingRequest->request);
     reqMsg.mutable_req()->set_clientid(clientid);
     reqMsg.mutable_req()->set_clientreqid(pendingRequest->clientReqId);
+    Debug("Sending request message %s", reqMsg.ShortDebugString().c_str());
     
     // XXX Try sending only to (what we think is) the leader first
     transport->SendMessageToReplica(this, 0, reqMsg);

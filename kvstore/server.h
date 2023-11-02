@@ -32,10 +32,13 @@ public:
     Server() {store = KVStore();};
     ~Server() {};
     void ReplicaUpcall(opnum_t opnum, const string &str1, string &str2);
+	void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate, string &res);
+	void SetReadValidation(bool validate_reads);
 
 private:
     // data store
     KVStore store;
+	bool doReadValidation = false;  // Consistent but unlogged reads
 
     struct Operation
     {

@@ -3,10 +3,12 @@
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/util/message_differencer.h>
 #include <vector>
+#include <sstream>
 
 #include "vrw/vrw-proto.pb.h"
 #include "lib/beehive_lib.h"
 #include "lib/message.h"
+#include "lib/assert.h"
 
 
 using namespace google::protobuf;
@@ -20,32 +22,50 @@ typedef struct __attribute__ ((packed)) {
 const uint64_t NONFRAG_MAGIC = 0x20050318;
 const uint64_t FRAG_MAGIC = 0x20101010;
 
+template <class T> std::vector<char> SerializeRepeatedLogEntries(T log_entries);
 static size_t ToBeehiveWire(const ::google::protobuf::Message &m, char *out);
 static const char * FromBeehiveWire(google::protobuf::Message *msg, const char *buf);
 static size_t get_beehive_wire_size(const ::google::protobuf::Message &m);
 static void write_u64_be(char *ptr, uint64_t value);
+static uint64_t read_u64_be(const char *ptr);
+static size_t get_log_entry_padding(size_t buf_size);
 
 
 static void hexdump_buf(const char *buf, size_t len) {
-    if (Message_DebugEnabled(__FILE__)) {
-        for (size_t i = 0; i < len; i++) {
-            printf("%02x", buf[i]);
-            printf("\n");
-        }
+    std::ostringstream buf_string;
+    char as_hex[1024];
+    for (size_t i = 0; i < len; i++) {
+        snprintf(as_hex, 3, "%02x", buf[i]);
+        buf_string << as_hex;
     }
+    Debug("%s", buf_string.str().c_str());
+
+//    for (size_t i = 0; i < len; i++) {
+//        Notice("%02x", buf[i]);
+//        Notice("\n");
+//    }
+    //if (Message_DebugEnabled(__FILE__)) {
+    //}
 }
 
 bool CheckMessage(const Message &orig_msg) {
     static specpaxos::vrw::proto::RequestMessage request;
     static specpaxos::vrw::proto::ReplyMessage reply;
+    static specpaxos::vrw::proto::ValidateRequestMessage validate_request;
+    static specpaxos::vrw::proto::ValidateReplyMessage validate_reply;
     static specpaxos::vrw::proto::PrepareMessage prepare;
     static specpaxos::vrw::proto::PrepareOKMessage prepareOK;
     static specpaxos::vrw::proto::CommitMessage commit;
+    static specpaxos::vrw::proto::RequestStateTransferMessage requestStateTransfer;
+    static specpaxos::vrw::proto::StateTransferMessage stateTransfer;
+    static specpaxos::vrw::proto::StartViewChangeMessage startViewChange;
+    static specpaxos::vrw::proto::DoViewChangeMessage doViewChange;
+    static specpaxos::vrw::proto::StartViewMessage startView;
     char *serialized_buf;
 
     bool result = false; 
     size_t buf_len = SerializeMessageBeehive(orig_msg, &serialized_buf);
-    Debug("Total buf len is %lu\n", buf_len);
+    Debug("Total buf len is %lu", buf_len);
     if (buf_len == 0) {
         Notice("Serialization not implemented, returning without checking\n");
         return true;
@@ -53,7 +73,7 @@ bool CheckMessage(const Message &orig_msg) {
     string msgType, msg;
 
     DecodePacketBeehive(serialized_buf+sizeof(uint32_t), buf_len-sizeof(uint32_t), msgType, msg);
-    Debug("Got message type %s\n", msgType.c_str());
+    Notice("Got message type %s", msgType.c_str());
     if (msgType == request.GetTypeName()) {
         request.ParseFromString(msg);
         result = util::MessageDifferencer::Equals(request, orig_msg);
@@ -61,6 +81,14 @@ bool CheckMessage(const Message &orig_msg) {
     else if (msgType == reply.GetTypeName()) {
         reply.ParseFromString(msg);
         result = util::MessageDifferencer::Equals(reply, orig_msg);
+    }
+    else if (msgType == validate_request.GetTypeName()) {
+        validate_request.ParseFromString(msg);
+        result = util::MessageDifferencer::Equals(validate_request, orig_msg); 
+    }
+    else if (msgType == validate_reply.GetTypeName()) {
+        validate_reply.ParseFromString(msg);
+        result = util::MessageDifferencer::Equals(validate_reply, orig_msg);
     }
     else if (msgType == prepare.GetTypeName()) {
         prepare.ParseFromString(msg);
@@ -73,6 +101,26 @@ bool CheckMessage(const Message &orig_msg) {
     else if (msgType == commit.GetTypeName()) {
         commit.ParseFromString(msg);
         result = util::MessageDifferencer::Equals(commit, orig_msg);
+    }
+    else if (msgType == requestStateTransfer.GetTypeName()) {
+        requestStateTransfer.ParseFromString(msg);
+        result = util::MessageDifferencer::Equals(requestStateTransfer, orig_msg);     
+    }
+    else if (msgType == stateTransfer.GetTypeName()) {
+        stateTransfer.ParseFromString(msg);
+        result = util::MessageDifferencer::Equals(stateTransfer, orig_msg);
+    }
+    else if (msgType == startViewChange.GetTypeName()) {
+        startViewChange.ParseFromString(msg);
+        result = util::MessageDifferencer::Equals(startViewChange, orig_msg);
+    }
+    else if (msgType == doViewChange.GetTypeName()) {
+        doViewChange.ParseFromString(msg);
+        result = util::MessageDifferencer::Equals(doViewChange, orig_msg);
+    }
+    else if (msgType == startView.GetTypeName()) {
+        startView.ParseFromString(msg);
+        result = util::MessageDifferencer::Equals(startView, orig_msg);
     }
 
     if (!result) {
@@ -87,12 +135,14 @@ bool CheckMessage(const Message &orig_msg) {
 size_t SerializeMessageBeehive(const ::google::protobuf::Message &m, char **out) {
     const google::protobuf::Descriptor *desc = m.GetDescriptor();
     std::string type = m.GetTypeName();
-    Debug("Serializing message with type %s\n", type.c_str());
+    Debug("Serializing message %s", m.ShortDebugString().c_str());
     MsgTypeEnum type_enum;
 
     // TODO: Handle view change types
     static specpaxos::vrw::proto::RequestMessage request;
     static specpaxos::vrw::proto::ReplyMessage reply;
+    static specpaxos::vrw::proto::ValidateRequestMessage validate_request;
+    static specpaxos::vrw::proto::ValidateReplyMessage validate_reply;
     static specpaxos::vrw::proto::PrepareMessage prepare;
     static specpaxos::vrw::proto::PrepareOKMessage prepareOK;
     static specpaxos::vrw::proto::CommitMessage commit;
@@ -107,9 +157,10 @@ size_t SerializeMessageBeehive(const ::google::protobuf::Message &m, char **out)
     size_t total_len = sizeof(uint32_t) + 1 + sizeof(uint64_t);
     size_t data_len = get_beehive_wire_size(m);
     char data_arr[data_len];
+    bool needs_free = false;
     size_t result_size;
     string serialized;
-    Debug("Data length is %lu\n", data_len);
+    Debug("Data length is %lu", data_len);
 
     if (type == prepare.GetTypeName()) {
         type_enum = MsgTypeEnum::Prepare;
@@ -121,6 +172,16 @@ size_t SerializeMessageBeehive(const ::google::protobuf::Message &m, char **out)
         result_size = ToBeehiveWire(m, data_arr);
         data = data_arr;
     } 
+    else if (type == validate_request.GetTypeName()) {
+        type_enum = MsgTypeEnum::ValidateReadRequest;
+        result_size = ToBeehiveWire(m, data_arr);
+        data = data_arr;
+    }
+    else if (type == validate_reply.GetTypeName()) {
+        type_enum = MsgTypeEnum::ValidateReadReply;
+        result_size = ToBeehiveWire(m, data_arr);
+        data = data_arr;
+    }
     else if (type == commit.GetTypeName()) {
         type_enum = MsgTypeEnum::Commit;
         result_size = ToBeehiveWire(m, data_arr);
@@ -146,9 +207,20 @@ size_t SerializeMessageBeehive(const ::google::protobuf::Message &m, char **out)
         data = data_arr;
     }
     else if (type == stateTransfer.GetTypeName()) {
+        const auto cast = dynamic_cast<const specpaxos::vrw::proto::StateTransferMessage &>(m);
+        specpaxos::vrw::proto::BeehiveStateTransferMessage actual_state_transfer;
+        actual_state_transfer.set_view(cast.view());
+        actual_state_transfer.set_opnum(cast.opnum());
+        auto serialized_entries = SerializeRepeatedLogEntries(cast.entries());
+        std::string string_entries(serialized_entries.begin(), serialized_entries.end());
+        actual_state_transfer.set_entries(string_entries);
+
+        data_len = get_beehive_wire_size(actual_state_transfer);
+        char *state_transfer_array = new char[data_len];
+        needs_free = true;
         type_enum = MsgTypeEnum::StateTransfer;
-        result_size = ToBeehiveWire(m, data_arr);
-        data = data_arr;
+        result_size = ToBeehiveWire(actual_state_transfer, state_transfer_array);
+        data = state_transfer_array;
     }
     else if (type == startViewChange.GetTypeName()) {
         type_enum = MsgTypeEnum::StartViewChange;
@@ -156,15 +228,41 @@ size_t SerializeMessageBeehive(const ::google::protobuf::Message &m, char **out)
         data = data_arr;
     }
     else if (type == doViewChange.GetTypeName()) {
-        data_len = get_beehive_wire_size(m);
+        const auto cast = dynamic_cast<const specpaxos::vrw::proto::DoViewChangeMessage &>(m);
+        specpaxos::vrw::proto::BeehiveDoViewChangeMessage actual_view_change;
+        actual_view_change.set_view(cast.view());
+        actual_view_change.set_lastnormalview(cast.lastnormalview());
+        actual_view_change.set_lastop(cast.lastop());
+        actual_view_change.set_lastcommitted(cast.lastcommitted());
+        actual_view_change.set_replicaidx(cast.replicaidx());
+        auto serialized_entries = SerializeRepeatedLogEntries(cast.entries());
+        std::string string_entries(serialized_entries.begin(), serialized_entries.end());
+        actual_view_change.set_entries(string_entries);
+
+
+        data_len = get_beehive_wire_size(actual_view_change);
+        char *do_change_array = new char[data_len];
+        needs_free = true;
         type_enum = MsgTypeEnum::DoViewChange;
-        result_size = ToBeehiveWire(m, data_arr);
-        data = data_arr;
+        result_size = ToBeehiveWire(actual_view_change, do_change_array);
+        data = do_change_array;
     }
     else if (type == startView.GetTypeName()) {
+        const auto cast = dynamic_cast<const specpaxos::vrw::proto::StartViewMessage &>(m);
+        specpaxos::vrw::proto::BeehiveStartViewMessage actual_start_view;
+        actual_start_view.set_view(cast.view());
+        actual_start_view.set_lastop(cast.lastop());
+        actual_start_view.set_lastcommitted(cast.lastcommitted());
+        auto serialized_entries = SerializeRepeatedLogEntries(cast.entries());
+        std::string string_entries(serialized_entries.begin(), serialized_entries.end());
+        actual_start_view.set_entries(string_entries);
+
+        data_len = get_beehive_wire_size(actual_start_view);
+        char *start_view_array = new char[data_len];
+        needs_free = true;
         type_enum = MsgTypeEnum::StartView;
-        result_size = ToBeehiveWire(m, data_arr);
-        data = data_arr;
+        result_size = ToBeehiveWire(actual_start_view, start_view_array);
+        data = start_view_array;
     }
     else {
         Panic("Got message type %s which has no enum value", type.c_str());
@@ -187,8 +285,68 @@ size_t SerializeMessageBeehive(const ::google::protobuf::Message &m, char **out)
     *out = out_buf;
     //Debug("Serialized buffer is ");
     //hexdump_buf(data, data_len);
+    if (needs_free) {
+        delete(data);
+    }
 
     return total_len;
+}
+
+static size_t get_log_entry_padding(size_t buf_size) {
+        size_t padding = 0;
+        if ((buf_size % 64) != 0) {
+            padding = 64 - (buf_size % 64);
+        }
+        ASSERT(((buf_size + padding) % 64) == 0);
+
+        return padding;
+}
+
+template <class T> std::vector<char>
+SerializeRepeatedLogEntries(T log_entries) {
+//    Notice("Serializing repeated log entries");
+    std::vector<char> serialized_log_entries;
+    for (auto log_entry : log_entries) {
+//        Notice("Serializing entry %s", log_entry.ShortDebugString().c_str());
+        // how big does our buffer need to be?
+        size_t buf_size = get_beehive_wire_size(log_entry);
+        size_t full_size = buf_size + 8;
+        size_t padding = get_log_entry_padding(full_size);
+        
+        // make a buffer
+        size_t full_buf_size = full_size + padding;
+        char log_entry_array[full_buf_size];
+
+        // write the size including the size field
+        write_u64_be(log_entry_array, full_size);
+        ToBeehiveWire(log_entry, log_entry_array + 8);
+        serialized_log_entries.insert(serialized_log_entries.end(), 
+                                log_entry_array, log_entry_array + full_buf_size);
+        hexdump_buf(log_entry_array, full_buf_size);
+    }
+    hexdump_buf(serialized_log_entries.data(), serialized_log_entries.size());
+    return serialized_log_entries;
+}
+
+template <class T> void
+DeserializeRepeatedLogEntries(const std::string &serialized_entries, T log_entries_out) {
+    //Notice("Deserializing repeated log entries");
+    const char* log_entries_buf = serialized_entries.c_str();
+    size_t entries_vec_offset;
+
+    while (entries_vec_offset < serialized_entries.size()) {
+        //Notice("offset is %lu", entries_vec_offset);
+        // figure out how long the entry is
+        uint64_t entry_len = read_u64_be(log_entries_buf + entries_vec_offset);
+        // serialize the entry back 
+        auto elem = log_entries_out->Add();
+        // skip past the size field
+        FromBeehiveWire(elem, log_entries_buf + entries_vec_offset + 8);
+        // calculate padding and update the offset
+        size_t padding = get_log_entry_padding(entry_len);
+        entries_vec_offset += entry_len + padding;
+        //Notice("Deserialized entry is %s", elem->ShortDebugString().c_str());
+    }
 }
 
 static void write_u64_be(char *ptr, uint64_t value) {
@@ -212,14 +370,13 @@ static size_t ToBeehiveWire(const ::google::protobuf::Message &m, char *out) {
     const Descriptor *desc = m.GetDescriptor();
     const Reflection *refl = m.GetReflection();
     char * curr_ptr = out;
-    size_t curr_size = 0;
 
     int num_fields = desc->field_count();
     for (int i = 0; i < num_fields; i++) {
         // get the field
         const FieldDescriptor * field_desc = desc->field(i);
         FieldDescriptor::Type field_type = field_desc->type();
-        Debug("Field %d has name %s and has type %d\n", i, field_desc->name().c_str(), field_desc->type());
+        Debug("Field %d has name %s and has type %d", i, field_desc->name().c_str(), field_desc->type());
         // is the field repeated?
         if (field_desc->is_repeated()) {
             // write the field count
@@ -227,13 +384,20 @@ static size_t ToBeehiveWire(const ::google::protobuf::Message &m, char *out) {
             write_u64_be(curr_ptr, (uint64_t)field_count);
             curr_ptr += sizeof(uint64_t);
 
-            Debug("Field is repeated with a count of %d\n", field_count);
+            Debug("Field is repeated with a count of %d", field_count);
             for (int rep_index = 0; rep_index < field_count; rep_index++) {
                 // figure out what type we're getting
                 switch (field_type) {
                     case FieldDescriptor::TYPE_MESSAGE: {
                         const Message &inner_msg = refl->GetRepeatedMessage(m, field_desc, rep_index);
                         curr_ptr += ToBeehiveWire(inner_msg, curr_ptr);
+                        break;
+                    }
+                    case FieldDescriptor::TYPE_BOOL: {
+                        uint8_t bool_value = (uint8_t)(refl->GetBool(m, field_desc));
+                        Debug("Bool value is %hhu", bool_value);
+                        curr_ptr[0] = bool_value;
+                        curr_ptr += sizeof(uint8_t);
                         break;
                     }
                     case FieldDescriptor::TYPE_UINT64: {
@@ -252,7 +416,7 @@ static size_t ToBeehiveWire(const ::google::protobuf::Message &m, char *out) {
                     }
                     case FieldDescriptor::TYPE_BYTES: {
                         std::string bytes = refl->GetRepeatedString(m, field_desc, rep_index);
-                        Debug("Field value is %s with length %lu\n", bytes.c_str(), bytes.length());
+                        Debug("Field value is %s with length %lu", bytes.c_str(), bytes.length());
                         write_u64_be(curr_ptr, bytes.length());
                         curr_ptr += sizeof(uint64_t);
                         memcpy(curr_ptr, bytes.c_str(), bytes.length());
@@ -273,23 +437,30 @@ static size_t ToBeehiveWire(const ::google::protobuf::Message &m, char *out) {
                     curr_ptr += ToBeehiveWire(inner_msg, curr_ptr);
                     break;
                 }
+                case FieldDescriptor::TYPE_BOOL: {
+                    uint8_t bool_value = (uint8_t)(refl->GetBool(m, field_desc));
+                    Debug("Bool value is %hhu", bool_value);
+                    curr_ptr[0] = bool_value;
+                    curr_ptr += sizeof(uint8_t);
+                    break;
+                }
                 case FieldDescriptor::TYPE_UINT64: {
                     uint64_t field_value = refl->GetUInt64(m, field_desc);
-                    Debug("Field value is %lu\n", field_value);
+                    Debug("Field value is %lu", field_value);
                     write_u64_be(curr_ptr, field_value);
                     curr_ptr += sizeof(uint64_t);
                     break;
                 }
                 case FieldDescriptor::TYPE_UINT32: {
                     uint32_t field_value = refl->GetUInt32(m, field_desc);
-                    Debug("Field value is %u\n", field_value);
+                    Debug("Field value is %u", field_value);
                     write_u64_be(curr_ptr, (uint64_t)field_value);
                     curr_ptr += sizeof(uint64_t);
                     break;
                 }
                 case FieldDescriptor::TYPE_BYTES: {
                     std::string bytes = refl->GetString(m, field_desc);
-                    Debug("Field value is %s with length %lu\n", bytes.c_str(), bytes.length());
+                    Debug("Field value is %s with length %lu", bytes.c_str(), bytes.length());
                     write_u64_be(curr_ptr, bytes.length());
                     curr_ptr += sizeof(uint64_t);
                     memcpy(curr_ptr, bytes.c_str(), bytes.length());
@@ -318,7 +489,6 @@ static size_t get_beehive_wire_size(const Message &m) {
     for (int i = 0; i < num_fields; i++) {
         const FieldDescriptor * field = desc->field(i);
         FieldDescriptor::Type field_type = field->type();
-        Debug("Serializing field %s\n", field->name().c_str());
 
         // is the field repeated?
         if (field->is_repeated()) {
@@ -330,6 +500,10 @@ static size_t get_beehive_wire_size(const Message &m) {
                         const Message &inner_msg = refl->GetRepeatedMessage(m, field, rep_index);
                         msg_size += get_beehive_wire_size(inner_msg);
                     }
+                    break;
+                }
+                case FieldDescriptor::TYPE_BOOL: {
+                    msg_size += (sizeof(uint8_t) * field_count);
                     break;
                 }
                 case FieldDescriptor::TYPE_UINT64: {
@@ -362,6 +536,10 @@ static size_t get_beehive_wire_size(const Message &m) {
                     msg_size += get_beehive_wire_size(inner_msg);
                     break;
                 }
+                case FieldDescriptor::TYPE_BOOL: {
+                    msg_size += sizeof(uint8_t);
+                    break;
+                }
                 case FieldDescriptor::TYPE_UINT64: {
                     msg_size += sizeof(uint64_t);
                     break;
@@ -392,14 +570,16 @@ void DecodePacketBeehive(const char *buf, size_t sz, string &type, string &msg) 
     // grab the type enum
     static specpaxos::vrw::proto::RequestMessage request;
     static specpaxos::vrw::proto::ReplyMessage reply;
+    static specpaxos::vrw::proto::ValidateRequestMessage validate_request;
+    static specpaxos::vrw::proto::ValidateReplyMessage validate_reply;
     static specpaxos::vrw::proto::PrepareMessage prepare;
     static specpaxos::vrw::proto::PrepareOKMessage prepareOK;
     static specpaxos::vrw::proto::CommitMessage commit;
     static specpaxos::vrw::proto::RequestStateTransferMessage requestStateTransfer;
-    static specpaxos::vrw::proto::StateTransferMessage stateTransfer;
+    static specpaxos::vrw::proto::BeehiveStateTransferMessage stateTransfer;
     static specpaxos::vrw::proto::StartViewChangeMessage startViewChange;
-    static specpaxos::vrw::proto::DoViewChangeMessage doViewChange;
-    static specpaxos::vrw::proto::StartViewMessage startView;
+    static specpaxos::vrw::proto::BeehiveDoViewChangeMessage doViewChange;
+    static specpaxos::vrw::proto::BeehiveStartViewMessage startView;
 
     Message *msg_used;
     MsgTypeEnum type_enum = (MsgTypeEnum)(buf[0]);
@@ -423,6 +603,20 @@ void DecodePacketBeehive(const char *buf, size_t sz, string &type, string &msg) 
             msg = string(rd_ptr, data_len);
             rd_ptr += data_len;
             msg_used = &reply;
+            break;
+        }
+        case (MsgTypeEnum::ValidateReadRequest): {
+            type = validate_request.GetTypeName();
+            rd_ptr = FromBeehiveWire(&validate_request, rd_ptr);
+            msg = validate_request.SerializeAsString();
+            msg_used = &validate_request;
+            break;
+        }
+        case (MsgTypeEnum::ValidateReadReply): {
+            type = validate_reply.GetTypeName();
+            rd_ptr = FromBeehiveWire(&validate_reply, rd_ptr);
+            msg = validate_reply.SerializeAsString(); 
+            msg_used = &validate_reply;
             break;
         }
         case (MsgTypeEnum::Prepare): {
@@ -455,31 +649,52 @@ void DecodePacketBeehive(const char *buf, size_t sz, string &type, string &msg) 
             break;
         }
         case(MsgTypeEnum::StateTransfer): {
-            type = stateTransfer.GetTypeName();
-            rd_ptr = FromBeehiveWire(&stateTransfer, rd_ptr);
-            msg = stateTransfer.SerializeAsString();
             msg_used = &stateTransfer;
+            rd_ptr = FromBeehiveWire(&stateTransfer, rd_ptr);
+            specpaxos::vrw::proto::StateTransferMessage protobuf_msg;
+            type = protobuf_msg.GetTypeName();
+            protobuf_msg.set_view(stateTransfer.view());
+            protobuf_msg.set_opnum(stateTransfer.opnum());
+            DeserializeRepeatedLogEntries(stateTransfer.entries(), protobuf_msg.mutable_entries());
+            
+            msg = protobuf_msg.SerializeAsString();
             break;
         }
         case(MsgTypeEnum::StartViewChange): {
             type = startViewChange.GetTypeName();
+            msg_used = &startViewChange;
             rd_ptr = FromBeehiveWire(&startViewChange, rd_ptr);
             msg = startViewChange.SerializeAsString();
-            msg_used = &startViewChange;
             break;
         }
         case (MsgTypeEnum::DoViewChange): {
-            type = doViewChange.GetTypeName();
-            rd_ptr = FromBeehiveWire(&doViewChange, rd_ptr);
-            msg = doViewChange.SerializeAsString();
             msg_used = &doViewChange;
+            rd_ptr = FromBeehiveWire(&doViewChange, rd_ptr);
+
+            specpaxos::vrw::proto::DoViewChangeMessage protobuf_msg;
+            type = protobuf_msg.GetTypeName();
+            protobuf_msg.set_view(doViewChange.view());
+            protobuf_msg.set_lastnormalview(doViewChange.lastnormalview());
+            protobuf_msg.set_lastop(doViewChange.lastop());
+            protobuf_msg.set_lastcommitted(doViewChange.lastcommitted());
+            protobuf_msg.set_replicaidx(doViewChange.replicaidx());
+            DeserializeRepeatedLogEntries(doViewChange.entries(), protobuf_msg.mutable_entries());
+
+            msg = protobuf_msg.SerializeAsString();
             break;
         }
         case (MsgTypeEnum::StartView): {
-            type = startView.GetTypeName();
-            rd_ptr = FromBeehiveWire(&startView, rd_ptr);
-            msg = startView.SerializeAsString();
             msg_used = &startView;
+            rd_ptr = FromBeehiveWire(&startView, rd_ptr);
+
+            specpaxos::vrw::proto::StartViewMessage protobuf_msg;
+            type = protobuf_msg.GetTypeName();
+            protobuf_msg.set_view(startView.view());
+            protobuf_msg.set_lastop(startView.lastop());
+            protobuf_msg.set_lastcommitted(startView.lastcommitted());
+            DeserializeRepeatedLogEntries(startView.entries(), protobuf_msg.mutable_entries());
+
+            msg = protobuf_msg.SerializeAsString();
             break;
         }
         default: {
@@ -501,13 +716,13 @@ static const char * FromBeehiveWire(Message *msg, const char *buf) {
         const FieldDescriptor * field_desc = desc->field(i);
         FieldDescriptor::Type field_type = field_desc->type();
 
-        Debug("Field %d has name %s and has type %d\n", i, field_desc->name().c_str(), field_desc->type());
+        Debug("Field %d has name %s and has type %d", i, field_desc->name().c_str(), field_desc->type());
         // is the field repeated?
         if (field_desc->is_repeated()) {
             // consume the field count
             uint64_t field_count = read_u64_be(rd_ptr);
             rd_ptr += sizeof(uint64_t);
-            Debug("Field is repeated with a count of%lu\n", field_count);
+            Debug("Field is repeated with a count of%lu", field_count);
 
             for (uint64_t rep_index = 0; rep_index < field_count; rep_index++) {
                 switch (field_type) {
@@ -516,29 +731,37 @@ static const char * FromBeehiveWire(Message *msg, const char *buf) {
                         rd_ptr = FromBeehiveWire(inner_msg, rd_ptr);
                         break;
                     }
+                    case FieldDescriptor::TYPE_BOOL: {
+                        bool bool_val = (bool)(rd_ptr[0]);
+                        refl->SetBool(msg, field_desc, bool_val);
+                        rd_ptr += sizeof(uint8_t);
+                        break;
+                    }
                     case FieldDescriptor::TYPE_UINT64: {
                         uint64_t field_val = read_u64_be(rd_ptr);
                         refl->AddUInt64(msg, field_desc, field_val);
                         rd_ptr += sizeof(uint64_t);
-                        Debug("Field value is %lu\n", field_val);
+                        Debug("Field value is %lu", field_val);
                         break;
                     }   
                     case FieldDescriptor::TYPE_UINT32: {
                         uint64_t field_val = read_u64_be(rd_ptr);
                         refl->AddUInt32(msg, field_desc, (uint32_t)(field_val));
                         rd_ptr += sizeof(uint64_t);
-                        Debug("Field value is %lu\n", field_val);
+                        Debug("Field value is %lu", field_val);
                         break;
                     }
                     case FieldDescriptor::TYPE_BYTES: {
                         // read length
                         uint64_t field_len = read_u64_be(rd_ptr);
                         rd_ptr += sizeof(uint64_t);
-                        Debug("Length is %lu\n", field_len);
+                        Debug("Length is %lu", field_len);
                         string bytes = string(rd_ptr, field_len);
-                        refl->AddString(msg, field_desc, bytes);
+                        if (field_len > 0) {
+                            refl->AddString(msg, field_desc, bytes);
+                        }
                         rd_ptr += field_len;
-                        Debug("Field value is %s\n", bytes.c_str());
+                        Debug("Field value is %s", bytes.c_str());
                         break;
                     }
                     default:
@@ -554,28 +777,36 @@ static const char * FromBeehiveWire(Message *msg, const char *buf) {
                     rd_ptr = FromBeehiveWire(inner_msg, rd_ptr);
                     break;
                 }
+                case FieldDescriptor::TYPE_BOOL: {
+                    bool bool_val = (bool)(rd_ptr[0]);
+                    refl->SetBool(msg, field_desc, bool_val);
+                    rd_ptr += sizeof(uint8_t);
+                    break;
+                }
                 case FieldDescriptor::TYPE_UINT64: {
                     uint64_t field_val = read_u64_be(rd_ptr);
                     refl->SetUInt64(msg, field_desc, field_val);
                     rd_ptr += sizeof(uint64_t);
-                    Debug("Field value is %lu\n", field_val);
+                    Debug("Field value is %lu", field_val);
                     break;
                 }
                 case FieldDescriptor::TYPE_UINT32: {
                     uint64_t field_val = read_u64_be(rd_ptr);
                     refl->SetUInt32(msg, field_desc, (uint32_t)field_val);
                     rd_ptr += sizeof(uint64_t);
-                    Debug("Field value is %lu\n", field_val);
+                    Debug("Field value is %lu", field_val);
                     break;
                 }
                 case FieldDescriptor::TYPE_BYTES: {
                     uint64_t field_len = read_u64_be(rd_ptr);
                     rd_ptr += sizeof(uint64_t);
-                    Debug("Length is %lu\n", field_len);
+                    Debug("Length is %lu", field_len);
                     string bytes = string(rd_ptr, field_len);
-                    refl->SetString(msg, field_desc, bytes);
+                    if (field_len > 0) {
+                        refl->SetString(msg, field_desc, bytes);
+                    }
                     rd_ptr += field_len;
-                    Debug("Field value is %s\n", bytes.c_str());
+                    Debug("Field value is %s", bytes.c_str());
                     break;
                 }
                 default: 

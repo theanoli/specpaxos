@@ -19,6 +19,8 @@ enum class MsgTypeEnum {
     StartViewChange = 10,
     DoViewChange = 11,
     StartView = 12,
+    ValidateReadRequest = 13,
+    ValidateReadReply = 14,
 
     NONE=255
 };

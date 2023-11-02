@@ -1,5 +1,20 @@
 import re
 import sys
+import matplotlib
+
+matplotlib.use('tkagg')
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from matplotlib import colors
+from matplotlib.ticker import PercentFormatter
+import matplotlib.colors as mcolors
+from pathlib import Path
+
+import os, sys, mmap
+import re
+from collections import defaultdict
 
 start, end = -1.0, -1.0
 
@@ -82,3 +97,13 @@ if len(xLatency) > 0:
 if len(fLatency) > 0:
   print("Average Latency (failure): ", sum(fLatency)/float(len(tLatency)-len(sLatency)))
   print("Extra (failure): ", fExtra)
+
+
+print("Max latency: ", max(tLatency))
+
+fig, ax = plt.subplots()
+
+ax.plot(tLatency, 1. * np.arange(len(tLatency))/(len(tLatency) - 1))
+ax.set_xlim(left=min(tLatency), right=tLatency[int((len(tLatency) * 99)/100)])
+
+plt.show()

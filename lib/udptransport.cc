@@ -425,6 +425,9 @@ SerializeMessage(const ::google::protobuf::Message &m, char **out)
 {
     size_t result = 0;
     if (USE_BEEHIVE == 1) {
+        //if (!CheckMessage(m)) {
+        //    Panic("Serialization returned a different message");
+        //}
         result = SerializeMessageBeehive(m, out);
         if (result == 0) { 
             Panic("Fatal Beehive serialization error");

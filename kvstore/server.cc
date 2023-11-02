@@ -34,6 +34,7 @@ Server::ReplicaUpcall(opnum_t opnum, const string &str1, string &str2)
 
     case Request::PUT:
         status = store.put(request.arg0(), request.arg1());
+		reply.set_value("");
         break;
 
     default:
@@ -43,6 +44,26 @@ Server::ReplicaUpcall(opnum_t opnum, const string &str1, string &str2)
     reply.SerializeToString(&str2);
 }
 
+void Server::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate, string &res)
+{
+	Request request;
+	request.ParseFromString(op);
+	
+	// We are doing a stealth read; do not replicate
+	if (doReadValidation && request.op() == Request::GET) {
+		replicate = false;
+		res = op;
+	} else {
+		replicate = true;
+		res = op; 
+	}
+}
+
+void 
+Server::SetReadValidation(bool do_read_validation)
+{
+	doReadValidation = do_read_validation; 
+}
 }
 
 static void Usage(const char *progName)
@@ -65,10 +86,18 @@ main(int argc, char **argv)
         PROTO_FAST,
     } proto = PROTO_UNKNOWN;
 
+	bool validate_reads = false;
+
   // Parse arguments
     int opt;
-    while ((opt = getopt(argc, argv, "c:i:m:")) != -1) {
+    while ((opt = getopt(argc, argv, "c:i:m:s")) != -1) {
         switch (opt) {
+			case 's': 
+				// Reads should not be logged but should be consistent
+				Notice("Doing read validation!");
+				validate_reads = true;
+				break; 
+
             case 'c':
                 configPath = optarg;
                 break;
@@ -143,16 +172,24 @@ main(int argc, char **argv)
 
     specpaxos::Replica *replica;
     kvstore::Server server;
+
     switch (proto) {
         case PROTO_VR:
 			server = kvstore::Server();
             replica = new specpaxos::vr::VRReplica(config, index, true,
                                                    &transport, 1, &server);
             break;
+			
 		case PROTO_VRW:
+			// TODO witness
 			server = kvstore::Server();
-            replica = new specpaxos::vrw::VRWReplica(config, index, true,
-                                                   &transport, 1, &server);
+			if (config.IsWitness(index)) {
+				replica = new specpaxos::vrw::VRWWitness(config, index, true,
+													   &transport, 1, &server);
+			} else {
+				replica = new specpaxos::vrw::VRWReplica(config, index, true,
+													   &transport, 1, &server);
+			}
             break;
 
 		case PROTO_SPEC:
@@ -170,6 +207,8 @@ main(int argc, char **argv)
             NOT_REACHABLE();
     }
     
+	server.SetReadValidation(validate_reads);
+
     (void)replica;              // silence warning
     transport.Run();
 
