@@ -126,7 +126,7 @@ VRWClient::SendRequest()
     Debug("Sending request message %s", reqMsg.ShortDebugString().c_str());
     
     // XXX Try sending only to (what we think is) the leader first
-    transport->SendMessageToReplicas(this, reqMsg);
+    transport->SendMessageToReplica(this, 0, reqMsg);
     
     requestTimeout->Reset();
 }
