@@ -26,7 +26,8 @@ def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title=
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     colors = list(mcolors.TABLEAU_COLORS)
-    symbols = ["o-", "o--", "v", "s", "D"]
+    dashings = ["-", "--"]
+    symbols = ["o", "^"]
     zI = 0
     sI = 0
     symbolValue = None
@@ -60,10 +61,10 @@ def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title=
         else:
             color = colors[zI]
             zI += 1
-        p, = ax.plot(xs, ys,  symbols[sI],c=color)
+        p, = ax.plot(xs, ys,  symbols[zI] + dashings[sI],c=color)
         for (x, y, e) in zip(xs, ys, es):
-            marker = symbols[sI] if e == 'no' else 'x' if e == 'yes' else 'p'
-            ax.plot(x,y,marker=marker[0], c=color,ms=4 if e=='no' else 8)
+            marker = symbols[zI] if e == 'no' else 'x' if e == 'yes' else 'p'
+            ax.plot(x,y,marker=marker, c=color,ms=4 if e=='no' else 8)
         p.set_label(zlayer)
         print(f"Plotting {xs} by {ys}")
     ax.set_ylim(bottom=0)
