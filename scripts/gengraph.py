@@ -15,7 +15,7 @@ import re
 from collections import defaultdict
 
 
-def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title='', sortX=True, connectZ=False):
+def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title='', symbolProp=None, sortX=True, connectZ=False):
     # Assumption: all datas have the same config and version for one graph() call
     # get all the (x, y, z, error) pairs
     #data4 = [(run[xprop], run[yprop], zprop_lambda(run), run['error']) for run in data]
@@ -25,21 +25,45 @@ def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title=
     fig, ax = plt.subplots()
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    colors = mcolors.TABLEAU_COLORS
-    for zlayer, color in zip(zlayers, colors):
+    colors = list(mcolors.TABLEAU_COLORS)
+    symbols = ["o-", "o--", "v", "s", "D"]
+    zI = 0
+    sI = 0
+    symbolValue = None
+    #for zlayer, color in zip(zlayers, colors):
+    for zlayer in zlayers:
+        data3Props = [xprop, yprop, 'error']
+        if symbolProp is not None:
+            data3Props += [symbolProp]
         if sortX:
-            data3 = sorted(df.loc[df[zprop] == zlayer][[xprop, yprop, 'error']].values.tolist(), key=lambda x: float(x[0]))
+            data3 = sorted(df.loc[df[zprop] == zlayer][data3Props].values.tolist(), key=lambda x: float(x[0]))
         else:
-            data3 = df.loc[df[zprop] == zlayer][[xprop, yprop, 'error']].values.tolist()
+            data3 = df.loc[df[zprop] == zlayer][data3Props].values.tolist()
         #data3 = [run for run in data4 if run[2] == zlayer]
         #print(data3)
         xs = [float(d[0]) for d in data3]
         ys = [float(d[1]) for d in data3]
         es = [(d[2]) for d in data3]
-        p, = ax.plot(xs, ys, c=color)
+        if symbolProp is not None:
+            sV = [(d[3]) for d in data3]
+            assert all(np.array(sV) == sV[0])
+            if symbolValue is None:
+                symbolValue = sV[0]
+            elif sV[0] != symbolValue:
+                print(f"mismatch in {sV[0]} and {symbolValue}")
+                symbolValue = sV[0]
+                zI += 1
+                sI = 0
+            else:
+                sI += 1
+            color = colors[zI]
+        else:
+            color = colors[zI]
+            zI += 1
+        p, = ax.plot(xs, ys,  symbols[sI],c=color)
         for (x, y, e) in zip(xs, ys, es):
-            marker = 'o' if e == 'no' else 'x' if e == 'yes' else 'p'
-            ax.plot(x,y,marker=marker, c=color,ms=4 if e=='no' else 8)
+            marker = symbols[sI] if e == 'no' else 'x' if e == 'yes' else 'p'
+            ax.plot(x,y,marker=marker[0], c=color,ms=4 if e=='no' else 8)
         p.set_label(zlayer)
         print(f"Plotting {xs} by {ys}")
     ax.set_ylim(bottom=0)

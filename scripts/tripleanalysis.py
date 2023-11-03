@@ -43,10 +43,11 @@ def main():
     df2["source + payload size"] = df2["source"] + " - " + df2["payload_size"].apply(str)
     df3["source + payload size"] = df3["source"] + " - " + df3["payload_size"].apply(str)
 
-    df = pd.concat([df1, df2, df3]).reset_index(drop=True)
+    #df = pd.concat([df1, df2, df3]).reset_index(drop=True)
+    df = pd.concat([df2, df3]).reset_index(drop=True)
 
     graph(df, m1,   'num_threads', 'average ops|sec', 'source + payload size', 
-                    'Num Clients', 'Operations/sec (ops/s)', 'Payload Size (B)', sortX=False)
+                    'Num Clients', 'Operations/sec (ops/s)', 'Payload Size (B)', symbolProp='source',sortX=False)
 
 
 if __name__ == '__main__':
