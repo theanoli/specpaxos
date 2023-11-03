@@ -146,6 +146,8 @@ def collapse_runs(data): # data_grouped_by_thread
         # TODO: add run0, run1, etc data to run if needed
     return data_grouped_by_runs
 
+# collapse('
+
 def graph(data, xprop, yprop, zprop_lambda, xlabel='', ylabel='', zlabel=''):
     # Assumption: all datas have the same config and version for one graph() call
     # get all the (x, y, z, error) pairs
@@ -198,7 +200,7 @@ def main():
     #print(data)
     data = collapse_threads(data)
     #print(data)
-    show_all_runs = False
+    show_all_runs = True
     if show_all_runs:
         graph(data, 'num_threads', 'total thruput', lambda x: x['payload_size'] + "." + f"{x['run_num']:>03}",
                     'Num Clients', 'Throughput (MB/s)', 'Payload Size.Run Number')
@@ -217,46 +219,3 @@ def main():
 if __name__ == '__main__':
     main()
 
-def __():
-    runtimes = defaultdict(0)
-    data = defaultdict(map)
-    flat_data = []
-
-    runs = 0
-
-    # try each run number
-
-    def get_data():
-        global data
-        global flat_data
-        global runtimes
-        global runs
-        for runNo in range(99999):
-            runtime = -1
-            for threadNo in range(int(num_threads)):
-                filename = filename_base + f",{threadNo},{runNo},.us"
-                # TODO: fail gracefully
-                path = Path(filename)
-                if not path.exists():
-                    return
-                my_data = map(int, path.read_text().strip().split("\n"))
-                runtime = max(runtime, sum(my_data))
-                #data[runNo][threadNo] = my_data
-                flat_data += my_data
-            runtimes[runNo] = runtime
-            runs += 1
-
-    get_data()
-
-
-    colors = ['aqua', 'red', 'gold', 'royalblue', 'darkorange', 'green', 'purple', 'cyan', 'yellow', 'lime']
-
-    decades = np.arange(50, 200, 10)
-    # look at ALL data
-    fig, ax = plt.subplots()
-    ax.set_xlim(0, 200)
-    cnts, values, bars = ax.hist(flat_data, edgecolor='k', bins=decades)
-    #print(flat_data)
-    for i, (cnt, value, bar) in enumerate(zip(cnts, values, bars)):
-        bar.set_facecolor(colors[i % len(colors)])
-    plt.show()

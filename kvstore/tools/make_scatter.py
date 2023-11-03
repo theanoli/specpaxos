@@ -180,6 +180,8 @@ def graph(data, xprop, yprop, zprop_lambda, xlabel='', ylabel='', zlabel=''):
             ax.plot(x,y,marker=marker, c=color,ms=4 if e=='no' else 8)
         p.set_label(zlayer)
         print(f"Plotting {xs} by {ys}")
+    ax.set_ylim(bottom=0)
+    ax.set_xlim(left=0)
     ax.legend(title=zlabel)
     # Assumption: all datas have the same config and version for one graph() call
     for run in data:
