@@ -27,7 +27,7 @@ def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title=
     plt.ylabel(ylabel)
     colors = list(mcolors.TABLEAU_COLORS)
     dashings = ["-", "--"]
-    symbols = ["o", "^"]
+    symbols = ["o", "^", "v", "<", ">", "D", "s"]
     zI = 0
     sI = 0
     symbolValue = None
@@ -51,20 +51,23 @@ def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title=
             if symbolValue is None:
                 symbolValue = sV[0]
             elif sV[0] != symbolValue:
-                print(f"mismatch in {sV[0]} and {symbolValue}")
+                #print(f"mismatch in {sV[0]} and {symbolValue}")
                 symbolValue = sV[0]
                 zI += 1
                 sI = 0
             else:
                 sI += 1
             color = colors[zI]
+            symbol = symbols[zI]
         else:
             color = colors[zI]
+            symbol = symbols[zI]
             zI += 1
-        p, = ax.plot(xs, ys,  symbols[zI] + dashings[sI],c=color)
+        p, = ax.plot(xs, ys,  symbol + dashings[sI],c=color)
         for (x, y, e) in zip(xs, ys, es):
-            marker = symbols[zI] if e == 'no' else 'x' if e == 'yes' else 'p'
-            ax.plot(x,y,marker=marker, c=color,ms=4 if e=='no' else 8)
+            if e != "no":
+                marker = symbol if e == 'no' else 'x' if e == 'yes' else 'p'
+                ax.plot(x,y,marker=marker, c=color,ms=4 if e=='no' else 10)
         p.set_label(zlayer)
         print(f"Plotting {xs} by {ys}")
     ax.set_ylim(bottom=0)
@@ -74,7 +77,7 @@ def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title=
     row0 = df.loc[0]
     if title == '':
         plt.title(row0['config'] + ", " + row0['version'])
-    savename = "graphs/"
+    savename = ""
     for item in meta:
         # ignore things in the graph
         if item in [xprop, yprop, zprop]: continue
@@ -83,9 +86,9 @@ def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title=
         else:
             savename += f"{item},"
 
-    savename += f"{xprop}@{yprop}@{zprop},"
-    savename += '.png'
+    savename += f"{xprop} vs {yprop} vs {zprop},"
     #plt.show()
-    plt.savefig(savename)
+    plt.savefig("graphs/" + savename + ".png")
+    plt.savefig("pdfs/" + savename + ".pdf")
     print(f"Saved graph to {savename}")
 

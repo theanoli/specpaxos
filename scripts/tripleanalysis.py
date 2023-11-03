@@ -24,7 +24,7 @@ def main():
     TIME_RAN = 30000000000
     WARMUP_TIME = 10
 
-    output = False
+    output = True
 
     df1, m1 = analyze(config1, version1, TIME_RAN, WARMUP_TIME, output=output)
     df2, m2 = analyze(config2, version2, TIME_RAN, WARMUP_TIME, output=output)

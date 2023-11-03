@@ -55,7 +55,7 @@ class FileIO:
             # check for errors
             # mmap it because it may be huge
             errors = "no"
-            if 'thread_num' not in run.keys() or run['thread_num'] == 0:
+            if 'thread_num' not in run.keys() or int(run['thread_num']) == 0:
                 errfile = self.make_filename(**run, suffix=".stderr")
                 if os.path.getsize(errfile) > 1000000:
                     errors = 'maybe'
