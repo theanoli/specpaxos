@@ -20,9 +20,9 @@ do
   cmd="$cmd -i $counter"
   cpuid=$((counter % `nproc`))
   if [ $begin == 0 ]; then
-	  command="echo splashed-grimace-grass3 | taskset -c $cpuid sudo -SE $cmd -p > $logdir/client.$i.log 2>&1 &"
+	  command="echo splashed-grimace-grass3 | sudo -SE renice -999 \$BASHPID && taskset -c $cpuid $cmd -p > $logdir/client.$i.log 2>&1 &"
   else 
-	  command="echo splashed-grimace-grass3 | taskset -c $cpuid sudo -SE $cmd > $logdir/client.$i.log 2>&1 &"
+	  command="echo splashed-grimace-grass3 | sudo -SE renice -999 \$BASHPID && taskset -c $cpuid $cmd > $logdir/client.$i.log 2>&1 &"
   fi 
   echo $command
   eval $command
