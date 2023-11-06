@@ -50,6 +50,8 @@
 #include <netdb.h>
 #include <signal.h>
 
+#include "lib/beehive_lib.h"
+
 const size_t MAX_DKUDP_MESSAGE_SIZE = 9000; // XXX
 const int SOCKET_BUF_SIZE = 10485760;
 
@@ -142,7 +144,6 @@ DKUDPTransport::LookupMulticastAddress(const specpaxos::Configuration
 static void
 BindToPort(int qd, const string &host, const string &port)
 {
-    Notice("Binding to socket at qd %d", qd);
     struct sockaddr_in sin = {0};
     int int_port = -1; 
 
@@ -259,12 +260,9 @@ DKUDPTransport::Register(TransportReceiver *receiver,
     // Update mappings
     receivers[qd] = receiver;
     qds[receiver] = qd;
-
-    Notice("Listening on DKUDP port %hu", ntohs(sin.sin_port));
 }
 
-static size_t
-SerializeMessage(const ::google::protobuf::Message &m, char **out)
+static size_t BaseSerializeMessage(const ::google::protobuf::Message &m, char **out)
 {
     string data = m.SerializeAsString();
     string type = m.GetTypeName();
@@ -302,6 +300,26 @@ SerializeMessage(const ::google::protobuf::Message &m, char **out)
     return totalLen;
 }
 
+static size_t
+SerializeMessage(const ::google::protobuf::Message &m, char **out)
+{
+    size_t result = 0;
+    if (USE_BEEHIVE == 1) {
+        //if (!CheckMessage(m)) {
+        //    Panic("Serialization returned a different message");
+        //}
+        result = SerializeMessageBeehive(m, out);
+        if (result == 0) { 
+            Panic("Fatal Beehive serialization error");
+        }
+    }
+    else {
+        result = BaseSerializeMessage(m, out);
+    }
+
+    return result;
+}
+
 bool
 DKUDPTransport::SendMessageInternal(TransportReceiver *src,
                                   const DKUDPTransportAddress &dst,
@@ -311,11 +329,11 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
     sockaddr_in sin = dynamic_cast<const DKUDPTransportAddress &>(dst).addr;
 
     // Serialize message
-    Notice("Preparing to seralize message to %s:%d", 
+    Debug("Preparing to seralize message to %s:%d", 
 		    inet_ntoa(sin.sin_addr), htons(sin.sin_port));
     char *buf;
     size_t msgLen = SerializeMessage(m, &buf);
-    Notice("Serialized");
+    Debug("Serialized");
 
 	// We should be able to send each message as a single SGA no matter the size...?
     demi_sgarray_t sga = demi_sgaalloc(msgLen);
@@ -346,7 +364,7 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
 void
 DKUDPTransport::Run()
 {
-    Notice("In the run loop.");
+    Debug("In the run loop.");
     // Pop an initial token and "register" the Demikernel check in libevent w/ timer. 
     demi_qtoken_t token = -1; 
     for (const auto &it : receivers) {
@@ -357,17 +375,16 @@ DKUDPTransport::Run()
         }
     }
 
-    Notice("Registering the Demikernel timer in libevent; %d tokens.", tokens.size());
+    Debug("Registering the Demikernel timer in libevent; %d tokens.", tokens.size());
     DemiTimer(1);
 
-    Notice("Dispatching the libevent base.");
+    Debug("Dispatching the libevent base.");
     event_base_dispatch(libeventBase);
     Notice("Exited the libevent loop!");
 }
 
 // Helper function for OnReadable; called after a packet is read in
-static void
-DecodePacket(const char *buf, size_t sz, string &type, string &msg)
+static void BaseDecodePacket(const char *buf, size_t sz, string &type, string &msg)
 {
     [[maybe_unused]] ssize_t ssz = sz;
     const char *ptr = buf;
@@ -388,6 +405,17 @@ DecodePacket(const char *buf, size_t sz, string &type, string &msg)
     ptr += msgLen;
 }
 
+static void
+DecodePacket(const char *buf, size_t sz, string &type, string &msg)
+{
+    if (USE_BEEHIVE == 1) {
+        DecodePacketBeehive(buf, sz, type, msg);
+    }
+    else {
+        BaseDecodePacket(buf, sz, type, msg);
+    }
+}
+
 void
 DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
 {
@@ -401,11 +429,10 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
         ssize_t sz = seg->sgaseg_len;
         char *buf = (char *)seg->sgaseg_buf;
         
-	struct sockaddr_in src = sga->sga_addr;
-	src.sin_port = ntohs(src.sin_port);
-        DKUDPTransportAddress senderAddr(src);
-	Notice("Got something to read from %s:%d!",
-		    inet_ntoa(senderAddr.addr.sin_addr), ntohs(senderAddr.addr.sin_port));
+        DKUDPTransportAddress senderAddr(sga->sga_addr);
+	senderAddr.addr.sin_port = htons(senderAddr.addr.sin_port);
+	Debug("Got something to read from %s:%d!",
+		    inet_ntoa(senderAddr.addr.sin_addr), htons(senderAddr.addr.sin_port));
         string msgType, msg;
 
         // Take a peek at the first field. If it's all zeros, this is
@@ -418,77 +445,10 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
                          msgType, msg);
         } else if (magic == FRAG_MAGIC) {
 	    Panic("Weren't supposed to get here...");
-		/*
-            // This is a fragment. Decode the header
-            const char *ptr = buf;
-            ptr += sizeof(uint32_t);
-            ASSERT(ptr-buf < sz);
-            uint64_t msgId = *((uint64_t *)ptr);
-            ptr += sizeof(uint64_t);
-            ASSERT(ptr-buf < sz);
-            size_t fragStart = *((size_t *)ptr);
-            ptr += sizeof(size_t);
-            ASSERT(ptr-buf < sz);
-            size_t msgLen = *((size_t *)ptr);
-            ptr += sizeof(size_t);
-            ASSERT(ptr-buf < sz);
-            ASSERT(buf+sz-ptr == (ssize_t) std::min(msgLen-fragStart,
-                                                    MAX_DKUDP_MESSAGE_SIZE));
-            Notice("Received fragment of %zd byte packet %" PRIx64 " starting at %zd",
-                   msgLen, msgId, fragStart);
-            DKUDPTransportFragInfo &info = fragInfo[senderAddr];
-            if (info.msgId == 0) {
-                info.msgId = msgId;
-                info.data.clear();
-            }
-            if (info.msgId != msgId) {
-                ASSERT(msgId > info.msgId);
-                Warning("Failed to reconstruct packet %" PRIx64 "", info.msgId);
-                info.msgId = msgId;
-                info.data.clear();
-            }
-            
-            if (fragStart != info.data.size()) {
-                Warning("Fragments out of order for packet %" PRIx64 "; "
-                        "expected start %zd, got %zd",
-                        msgId, info.data.size(), fragStart);
-                continue;
-            }
-            
-            info.data.append(string(ptr, buf+sz-ptr));
-            if (info.data.size() == msgLen) {
-                Debug("Completed packet reconstruction");
-                DecodePacket(info.data.c_str(), info.data.size(),
-                             msgType, msg);
-                info.msgId = 0;
-                info.data.clear();
-            } else {
-                continue;
-            }
-	    */
         } else {
             Warning("Received packet with bad magic number");
         }
 
-        // Was this received on a multicast qd?
-	/*
-        auto it = multicastConfigs.find(qd);
-        if (it != multicastConfigs.end()) {
-            // If so, deliver the message to all replicas for that
-            // config, *except* if that replica was the sender of the
-            // message.
-            const specpaxos::Configuration *cfg = it->second;
-            for (auto &kv : replicaReceivers[cfg]) {
-                TransportReceiver *receiver = kv.second;
-                const DKUDPTransportAddress &raddr = 
-                    replicaAddresses[cfg].find(kv.first)->second;
-                // Don't deliver a message to the sending replica
-                if (raddr != senderAddr) {
-                    receiver->ReceiveMessage(senderAddr, msgType, msg);
-                }
-            }
-        } else {
-	*/
         receiver->ReceiveMessage(senderAddr, msgType, msg);
     }
     
@@ -631,7 +591,7 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 void
 DKUDPTransport::TimerCallback(evutil_socket_t qd, short what, void *arg)
 {
-	Notice("Timer went off!\n");
+	Debug("Timer went off!\n");
     DKUDPTransport::DKUDPTransportTimerInfo *info =
         (DKUDPTransport::DKUDPTransportTimerInfo *)arg;
 

@@ -415,7 +415,7 @@ VRWReplica::CloseBatch()
     p.set_opnum(lastOp);
     p.set_batchstart(batchStart);
 	p.set_cleanupto(GetLowestReplicaCommit()); 
-	p.set_lastcommitted(lastCommitted); 
+	//p.set_lastcommitted(lastCommitted); 
 	
     for (opnum_t i = batchStart; i <= lastOp; i++) {
         Request *r = p.add_request();
@@ -889,7 +889,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
                                           reply))) {
         RWarning("Failed to send PrepareOK message to leader");
     }
-	CommitUpTo(msg.lastcommitted());
+	//CommitUpTo(msg.lastcommitted());
 }
 
 void
@@ -959,7 +959,6 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
          * This can be done asynchronously, so it really ought to be
          * piggybacked on the next PREPARE or something.
          */
-	/*
         CommitMessage cm;
         cm.set_view(this->view);
         cm.set_opnum(this->lastCommitted);
@@ -970,7 +969,6 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
         }
 
         nullCommitTimeout->Reset();
-	*/
 
         // XXX Adaptive batching -- make this configurable
         if (lastBatchEnd == msg.opnum()) {

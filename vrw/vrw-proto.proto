@@ -39,9 +39,9 @@ message PrepareMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;
     required uint64 batchstart = 3;
-    repeated Request request = 4;
-	required uint64 cleanUpTo = 5;
-	required uint64 lastCommitted = 6;
+	required uint64 cleanUpTo = 4;
+//	required uint64 lastCommitted = 5;
+    repeated Request request = 5;
 }
 
 message PrepareOKMessage {
@@ -65,13 +65,19 @@ message StateTransferMessage {
     message LogEntry {
         required uint64 view = 1;
         required uint64 opnum = 2;
-        required specpaxos.Request request = 3;
-        optional uint32 state = 4;
-        optional bytes hash = 5;
+        optional uint32 state = 3;
+        optional bytes hash = 4;
+        required specpaxos.Request request = 5;
     }
     required uint64 view = 1;
     required uint64 opnum = 2;
     repeated LogEntry entries = 3;
+}
+
+message BeehiveStateTransferMessage {
+    required uint64 view = 1;
+    required uint64 opnum = 2;
+    required bytes entries = 3;
 }
 
 message StartViewChangeMessage {
@@ -84,30 +90,46 @@ message DoViewChangeMessage {
     message LogEntry {
         required uint64 view = 1;
         required uint64 opnum = 2;
-        required specpaxos.Request request = 3;
-        optional uint32 state = 4;
-        optional bytes hash = 5;
+        optional uint32 state = 3;
+        optional bytes hash = 4;
+        required specpaxos.Request request = 5;
     }
     required uint64 view = 1;
     required uint64 lastNormalView = 2;
     required uint64 lastOp = 3;
     required uint64 lastCommitted = 4;
-    repeated LogEntry entries = 5;
-    required uint32 replicaIdx = 6;    
+    required uint32 replicaIdx = 5;    
+    repeated LogEntry entries = 6;
+}
+
+message BeehiveDoViewChangeMessage {
+    required uint64 view = 1;
+    required uint64 lastNormalView = 2;
+    required uint64 lastOp = 3;
+    required uint64 lastCommitted = 4;
+    required uint32 replicaIdx = 5;    
+    required bytes  entries = 6;
 }
 
 message StartViewMessage {
     message LogEntry {
         required uint64 view = 1;
         required uint64 opnum = 2;
-        required specpaxos.Request request = 3;
-        optional uint32 state = 4;
-        optional bytes hash = 5;
+        optional uint32 state = 3;
+        optional bytes hash = 4;
+        required specpaxos.Request request = 5;
     }
     required uint64 view = 1;
     required uint64 lastOp = 2;
     required uint64 lastCommitted = 3;
     repeated LogEntry entries = 4;
+}
+
+message BeehiveStartViewMessage {
+    required uint64 view = 1;
+    required uint64 lastOp = 2;
+    required uint64 lastCommitted = 3;
+    required bytes  entries = 4; 
 }
 
 message RecoveryMessage {
@@ -119,14 +141,14 @@ message RecoveryResponseMessage {
     message LogEntry {
         required uint64 view = 1;
         required uint64 opnum = 2;
-        required specpaxos.Request request = 3;
-        optional uint32 state = 4;
-        optional bytes hash = 5;
+        optional uint32 state = 3;
+        optional bytes hash = 4;
+        required specpaxos.Request request = 5;
     }
     required uint64 view = 1;
     required uint64 nonce = 2;
-    repeated LogEntry entries = 3;
-    optional uint64 lastOp = 4;
-    optional uint64 lastCommitted = 5;
-    required uint32 replicaIdx = 6;
+    optional uint64 lastOp = 3;
+    optional uint64 lastCommitted = 4;
+    required uint32 replicaIdx = 5;
+    repeated LogEntry entries = 6;
 }
