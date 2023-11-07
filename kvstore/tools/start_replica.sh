@@ -21,8 +21,7 @@ do
   server=$(cat $config | sed -n ${line}p | awk -F'[ :]' '{print $2}')
   command="ssh $server \"mkdir -p $logdir; \
 	  source $HOME/specpaxos/kvstore/tools/set_demi_env.sh; \
-	  cat $passwdfile | sudo -S renice -999 \\$\\$ && \
-	  cat $passwdfile | sudo -SE taskset -c 0 $cmd -c $config -i $i > \
+	  cat $passwdfile | sudo -SE nice -n -999 taskset -c 0 $cmd -c $config -i $i > \
 	  $logdir/$shard.replica$i.log 2>&1 &\""
   echo $command
   eval $command

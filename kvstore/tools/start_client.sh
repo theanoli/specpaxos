@@ -22,11 +22,9 @@ do
   cmd="$cmd -i $counter"
   cpuid=$((counter % `nproc`))
   if [ $begin == 0 ]; then
-	  command="cat $passwdfile | sudo -S renice -999 \$\$ && \
-		  cat $passwdfile | sudo -SE taskset -c $cpuid $cmd -p > $logdir/client.$i.log 2>&1 &"
+	  command="cat $passwdfile | sudo -SE nice -n -999 taskset -c $cpuid $cmd -p > $logdir/client.$i.log 2>&1 &"
   else 
-	  command="cat $passwdfile | sudo -S renice -999 \$\$ && \
-		  cat $passwdfile | sudo -SE taskset -c $cpuid $cmd > $logdir/client.$i.log 2>&1 &"
+	  command="cat $passwdfile | sudo -SE nice -n -999 taskset -c $cpuid $cmd > $logdir/client.$i.log 2>&1 &"
   fi 
   echo $command
   eval $command
