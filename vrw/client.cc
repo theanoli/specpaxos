@@ -77,7 +77,7 @@ VRWClient::Invoke(const string &request,
         Panic("Client only supports one pending request");
     }
 
-    Notice("In invoke");
+    Debug("In invoke");
     ++lastReqId;
     uint64_t reqId = lastReqId;
     pendingRequest = new PendingRequest(request, reqId, continuation);
@@ -118,7 +118,7 @@ VRWClient::InvokeUnlogged(int replicaIdx,
 void
 VRWClient::SendRequest()
 {
-    Notice("In SendRequest");
+    Debug("In SendRequest");
     proto::RequestMessage reqMsg;
     reqMsg.mutable_req()->set_op(pendingRequest->request);
     reqMsg.mutable_req()->set_clientid(clientid);
@@ -170,7 +170,7 @@ VRWClient::HandleReply(const TransportAddress &remote,
         return;
     }
 
-    Notice("Client received reply");
+    Debug("Client received reply");
 
     requestTimeout->Stop();
 

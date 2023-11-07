@@ -161,7 +161,6 @@ BindToPort(int qd, const string &host, const string &port)
     Notice("Bound to %s:%d (input: %s:%s)", 
 		    inet_ntoa(sin.sin_addr), htons(sin.sin_port), 
 		    host.c_str(), port.c_str());
-
 }
 
 DKUDPTransport::DKUDPTransport(double dropRate, double reorderRate,
@@ -218,6 +217,8 @@ DKUDPTransport::Register(TransportReceiver *receiver,
                        const specpaxos::Configuration &config,
                        int replicaIdx)
 {
+    Notice("Registering receiver with%s Beehive serialization layer", 
+		    USE_BEEHIVE ? "" : "out");
     ASSERT(replicaIdx < config.n);
 
     this->replicaIdx = replicaIdx;
@@ -376,7 +377,7 @@ DKUDPTransport::Run()
     }
 
     Debug("Registering the Demikernel timer in libevent; %d tokens.", tokens.size());
-    DemiTimer(1);
+    DemiTimer(10);
 
     Debug("Dispatching the libevent base.");
     event_base_dispatch(libeventBase);
@@ -456,13 +457,13 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
 }
 
 int
-DKUDPTransport::DemiTimer(uint64_t us)
+DKUDPTransport::DemiTimer(uint64_t ms)
 {
     DKUDPTransportTimerInfo *info = new DKUDPTransportTimerInfo();
 
     struct timeval tv;
-    tv.tv_sec = us/1000000;
-    tv.tv_usec = (us % 1000000) * 1000000;
+    tv.tv_sec = ms/1000;
+    tv.tv_usec = (ms % 1000) * 1000;
     
     info->transport = this;
     info->id = 0;
@@ -547,7 +548,7 @@ DKUDPTransport::OnDemiTimer(DKUDPTransportTimerInfo *info)
     
     CheckQdCallback(info->transport);
 
-    info->transport->DemiTimer(1);
+    info->transport->DemiTimer(10);
 
     delete info;
 }
@@ -559,7 +560,7 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 {
     struct timespec ts; 
     ts.tv_sec = 0; 
-    ts.tv_nsec = 1;
+    ts.tv_nsec = 1000;
     
 	int status = -1;
     demi_qresult_t wait_out = {};
@@ -570,7 +571,7 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
     
     // if we got an EOK back from wait
     if (status == 0) {
-        Notice("Found something: qd=%d", wait_out.qr_qd);
+        Debug("Found something: qd=%d", wait_out.qr_qd);
 	// process request
 	demi_sgarray_t &sga = wait_out.qr_value.sga;
 	assert(sga.sga_numsegs > 0);
