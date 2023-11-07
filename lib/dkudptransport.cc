@@ -559,7 +559,7 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 {
     struct timespec ts; 
     ts.tv_sec = 0; 
-    ts.tv_nsec = 0;
+    ts.tv_nsec = 1;
     
 	int status = -1;
     demi_qresult_t wait_out = {};
