@@ -5,6 +5,8 @@ config=$2   # path to config file
 cmd=$3      # command to run
 logdir=$4   # log directory
 
+passwdfile=$HOME/specpaxos/kvstore/tools/passwd
+
 if [ "$#" -ne 4 ]; then
   echo "Usage: $0 shard configpath command logdir" >&2
   exit 1
@@ -17,7 +19,11 @@ for ((i=0; i<$n; i++))
 do
   let line=$i+2 
   server=$(cat $config | sed -n ${line}p | awk -F'[ :]' '{print $2}')
-  command="ssh $server \"mkdir -p $logdir; source $HOME/specpaxos/kvstore/tools/set_demi_env.sh; echo splashed-grimace-grass3 | sudo -SE renice -999 \\$\\$ && taskset -c 0 $cmd -c $config -i $i > $logdir/$shard.replica$i.log 2>&1 &\""
+  command="ssh $server \"mkdir -p $logdir; \
+	  source $HOME/specpaxos/kvstore/tools/set_demi_env.sh; \
+	  cat $passwdfile | sudo -S renice -999 \\$\\$ && \
+	  cat $passwdfile | sudo -SE taskset -c 0 $cmd -c $config -i $i > \
+	  $logdir/$shard.replica$i.log 2>&1 &\""
   echo $command
   eval $command
   echo "Done with replica $i"

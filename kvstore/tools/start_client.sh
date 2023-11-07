@@ -10,6 +10,8 @@ begin=$2
 copies=$3
 logdir=$4
 
+passwdfile=$HOME/specpaxos/kvstore/tools/passwd
+
 let end=$begin+$copies
 
 source $HOME/specpaxos/kvstore/tools/set_demi_env.sh
@@ -20,9 +22,11 @@ do
   cmd="$cmd -i $counter"
   cpuid=$((counter % `nproc`))
   if [ $begin == 0 ]; then
-	  command="echo splashed-grimace-grass3 | sudo -SE renice -999 \$BASHPID && taskset -c $cpuid $cmd -p > $logdir/client.$i.log 2>&1 &"
+	  command="cat $passwdfile | sudo -S renice -999 \$\$ && \
+		  cat $passwdfile | sudo -SE taskset -c $cpuid $cmd -p > $logdir/client.$i.log 2>&1 &"
   else 
-	  command="echo splashed-grimace-grass3 | sudo -SE renice -999 \$BASHPID && taskset -c $cpuid $cmd > $logdir/client.$i.log 2>&1 &"
+	  command="cat $passwdfile | sudo -S renice -999 \$\$ && \
+		  cat $passwdfile | sudo -SE taskset -c $cpuid $cmd > $logdir/client.$i.log 2>&1 &"
   fi 
   echo $command
   eval $command
