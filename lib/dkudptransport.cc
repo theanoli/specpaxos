@@ -456,13 +456,13 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
 }
 
 int
-DKUDPTransport::DemiTimer(uint64_t ms)
+DKUDPTransport::DemiTimer(uint64_t us)
 {
     DKUDPTransportTimerInfo *info = new DKUDPTransportTimerInfo();
 
     struct timeval tv;
-    tv.tv_sec = ms/1000;
-    tv.tv_usec = (ms % 1000) * 1000;
+    tv.tv_sec = us/1000000;
+    tv.tv_usec = (us % 1000000) * 1000000;
     
     info->transport = this;
     info->id = 0;
@@ -559,7 +559,7 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 {
     struct timespec ts; 
     ts.tv_sec = 0; 
-    ts.tv_nsec = 5000;  // TODO set this properly? Is setting to 0 OK? 
+    ts.tv_nsec = 0;
     
 	int status = -1;
     demi_qresult_t wait_out = {};
