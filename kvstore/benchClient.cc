@@ -188,7 +188,9 @@ main(int argc, char **argv)
 
 		key = keys[rand_key()];
 
-		if (rand() % 100 < writePercentage) {
+		bool isPut = rand() % 100 < writePercentage;
+
+		if (isPut) {
 			gettimeofday(&t2, NULL);
 			client.Put(key, key);
 			gettimeofday(&t3, NULL);
@@ -209,10 +211,10 @@ main(int argc, char **argv)
 
 		// Keys will always exist?!
 		ASSERT(status);
-        fprintf(stderr, "%d %ld.%06ld %ld.%06ld %ld %d\n", nOps+1, 
+        fprintf(stderr, "%d %ld.%06ld %ld.%06ld %ld %d %d\n", nOps+1, 
 				t1.tv_sec, (long)t1.tv_usec, 
 				t2.tv_sec, (long)t2.tv_usec, 
-				latency, 1);
+				latency, 1, isPut);
 
 		tLatency += latency;
         nOps++;
