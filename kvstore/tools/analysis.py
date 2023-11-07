@@ -21,6 +21,7 @@ def process_file(filepath):
     tLatency = []
     sLatency = []
     fLatency = []
+    readWrites = []
 
     tExtra = 0.0
     sExtra = 0.0
@@ -66,6 +67,9 @@ def process_file(filepath):
         if status == 1:
             sLatency.append(latency)
             sExtra += extra
+            if ttype == 0 or ttype == 1:
+                readWrites.append(ttype)
+            
         else:
             fLatency.append(latency)
             fExtra += extra
@@ -75,11 +79,11 @@ def process_file(filepath):
         #sys.exit()
         error = 'yes'
 
-    tLatency.sort()
-    sLatency.sort()
-    fLatency.sort()
+    #tLatency.sort()
+    #sLatency.sort()
+    #fLatency.sort()
 
-    return {"raw data": sLatency, "start": start, "end": end, "error": error, "file": filepath}
+    return {"raw data": sLatency, "read writes": readWrites, "start": start, "end": end, "error": error, "file": filepath}
 
 
 def analyze(config, version, output=True):
@@ -88,25 +92,25 @@ def analyze(config, version, output=True):
     df, meta = fio.get_raw_data({'config': config, 'version': version}, process_file)
 
     df["total runtime"] = df["end"] - df["start"]
-    df["average latency"] = df["raw data"].apply(np.mean)
+    df["median latency"] = df["raw data"].apply(np.median)
     df["num reqs"] = df["raw data"].apply(len)
     df["total ops|sec"] = df["num reqs"] / df["total runtime"]
     if output:
         print(df.head())
-        graph(df, meta, 'total ops|sec', 'average latency', 'threads_per_client',
-                        'Throughput (ops/s)', 'Average Latency (us)', 'Threads per client')
+        graph(df, meta, 'total ops|sec', 'median latency', 'threads_per_client',
+                        'Throughput (ops/s)', 'Median Latency (us)', 'Threads per client')
 
     # average the throughput and latency
     df, meta = collapse(df, meta, ['run_num'], 
             {'average runtime': ('total runtime', 'mean'),
-             'average average latency': ('average latency', 'mean'),
+             'average median latency': ('median latency', 'mean'),
              'average ops|sec': ('total ops|sec', 'mean')})
 
     # before graphing, sort by threads_per_client to make the graph look nice
     df = df.sort_values("threads_per_client")
     if output:
-        graph(df, meta, 'average ops|sec', 'average average latency', 'num_clients',
-                        'Average Throughput (ops/s)', 'Average Latency (us)', 'Num hosts', sortX=False)
+        graph(df, meta, 'average ops|sec', 'average median latency', 'num_clients',
+                        'Average Throughput (ops/s)', 'Average Median Latency (us)', 'Num hosts', sortX=False)
     return df, meta
 
 

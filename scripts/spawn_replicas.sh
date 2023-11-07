@@ -84,7 +84,7 @@ startFPGAs() {
         # intialize the state
         # get our local ip
         local my_ip=$(ip route get ${key} | head -n 1 | sed 's/.*src //' | cut -d " " -f 1)
-        local config_cmd="python3 ${BEEHIVE_SCRIPTS}/beehive_vr_witness_setup.py --rep_index ${index} --witness_addr ${key} --witness_port 52001 --src_addr ${my_ip} --src_port 53212"
+        local config_cmd="python3 ${BEEHIVE_SCRIPTS}/beehive_vr_witness_setup.py --rep_index ${index} --witness_addr ${key} --witness_port 51000 --src_addr ${my_ip} --src_port 53212 --config_file ${CONFIG_FILE}"
         echo ${config_cmd}
         eval ${config_cmd}
     done

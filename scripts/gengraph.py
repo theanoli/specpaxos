@@ -15,12 +15,17 @@ import re
 from collections import defaultdict
 
 
-def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title='', symbolProp=None, sortX=True, connectZ=False):
+def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title='', symbolProp=None, sortX=True, connectZ=False, left=0, right=None, bottom=0, extra_title="", xscale="linear", yscale="linear", markersize=None):
     # Assumption: all datas have the same config and version for one graph() call
     # get all the (x, y, z, error) pairs
     #data4 = [(run[xprop], run[yprop], zprop_lambda(run), run['error']) for run in data]
     # get all unique z layers
     #zlayers = sorted(list(set(run[2] for run in data4)), key=lambda x: float(x))
+    if zprop is None:
+        zprop = '_zee'
+        zlabel = None
+        df[zprop] = '0'
+    #print('z props:', df[zprop].unique())
     zlayers = sorted(df[zprop].unique())
     fig, ax = plt.subplots()
     plt.xlabel(xlabel)
@@ -36,10 +41,9 @@ def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title=
         data3Props = [xprop, yprop, 'error']
         if symbolProp is not None:
             data3Props += [symbolProp]
+        data3 = df.loc[df[zprop] == zlayer][data3Props].values.tolist()
         if sortX:
-            data3 = sorted(df.loc[df[zprop] == zlayer][data3Props].values.tolist(), key=lambda x: float(x[0]))
-        else:
-            data3 = df.loc[df[zprop] == zlayer][data3Props].values.tolist()
+            data3 = sorted(data3, key=lambda x: float(x[0]))
         #data3 = [run for run in data4 if run[2] == zlayer]
         #print(data3)
         xs = [float(d[0]) for d in data3]
@@ -63,16 +67,25 @@ def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title=
             color = colors[zI]
             symbol = symbols[zI]
             zI += 1
-        p, = ax.plot(xs, ys,  symbol + dashings[sI],c=color)
+        p, = ax.plot(xs, ys,  symbol + dashings[sI],c=color, markersize=markersize)
         for (x, y, e) in zip(xs, ys, es):
             if e != "no":
                 marker = symbol if e == 'no' else 'x' if e == 'yes' else 'p'
                 ax.plot(x,y,marker=marker, c=color,ms=4 if e=='no' else 10)
-        p.set_label(zlayer)
-        print(f"Plotting {xs} by {ys}")
-    ax.set_ylim(bottom=0)
-    ax.set_xlim(left=0)
-    ax.legend(title=zlabel)
+        if zlabel is not None:
+            p.set_label(zlayer)
+        if len(ys) < 300:
+            print(f"Plotting {xs} by {ys}")
+    if bottom is not None:
+        ax.set_ylim(bottom=bottom)
+    if left is not None:
+        ax.set_xlim(left=left)
+    if right is not None:
+        ax.set_xlim(right=right)
+    ax.set_xscale(xscale)
+    ax.set_yscale(yscale)
+    if zlabel is not None:
+        ax.legend(title=zlabel)
     # Assumption: all datas have the same config and version for one graph() call
     row0 = df.loc[0]
     if title == '':
@@ -87,6 +100,7 @@ def graph(df, meta, xprop, yprop, zprop, xlabel='', ylabel='', zlabel='', title=
             savename += f"{item},"
 
     savename += f"{xprop} vs {yprop} vs {zprop},"
+    savename += extra_title + ","
     #plt.show()
     plt.savefig("graphs/" + savename + ".png")
     plt.savefig("pdfs/" + savename + ".pdf")

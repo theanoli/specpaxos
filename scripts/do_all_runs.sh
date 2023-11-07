@@ -12,7 +12,7 @@ DEFAULT_WARMUP_PERIOD=10
 set -e
 
 # iterate over threads
-for threads in 1 2 4 8 16; do
+for threads in 1 2 4 8 16 32; do
 	# iterate over payload size
 	for payload in 32 64 128 256 512 1024; do
 		./run_wrapper.sh $CONFIG $VERSION_NO $threads $DEFAULT_RUNTIME $payload $DEFAULT_WARMUP_PERIOD

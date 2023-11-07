@@ -18,6 +18,7 @@ def analyze(config, version, time_ran, warmup_period, output=True):
 
     df["thread runtime"] = df["raw data"].apply(sum)
     df["num reqs"] = df["raw data"].apply(len)
+    df["median thread latency"] = df["raw data"].apply(np.median)
     df["average thread latency"] = df["thread runtime"] / df["num reqs"]
     #print(df.head())
 

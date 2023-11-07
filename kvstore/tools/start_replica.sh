@@ -26,7 +26,7 @@ do
     index=$i
     my_ip=$(ip route get ${server} | head -n 1 | sed 's/.*src //' | cut -d " " -f 1)
     command="${BEEHIVE_SCRIPTS}/reset_fpga_remote.sh ${SUDO_PASSWD_FILE} fpga_${index}_reset ${CORUNDUM_SCRIPTS} ${FPGA_IP_PCIE[${server}]} ${server} && sleep 5 && \
-             python3 ${BEEHIVE_SCRIPTS}/beehive_vr_witness_setup.py --rep_index ${index} --witness_addr ${server} --witness_port 52001 --src_addr ${my_ip} --src_port 53212 && sleep 5"
+             python3 ${BEEHIVE_SCRIPTS}/beehive_vr_witness_setup.py --rep_index ${index} --witness_addr ${server} --witness_port 51000 --src_addr ${my_ip} --src_port 53212 --config_file $config && sleep 5"
     echo $command
     eval $command
     echo "Done with replica $i"
