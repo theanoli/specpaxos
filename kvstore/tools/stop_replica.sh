@@ -2,6 +2,9 @@
 
 config=$1   # path to config file
 
+passwdfile=$HOME/specpaxos/kvstore/tools/passwd
+killscript=$HOME/specpaxos/kvstore/tools/forcekill.sh
+
 if [ "$#" -ne 1 ]; then
   echo "Usage: $0 configpath" >&2
   exit 1
@@ -14,7 +17,7 @@ for ((i=0; i<$n; i++))
 do
   let line=$i+2 
   server=$(cat $config | sed -n ${line}p | awk -F'[ :]' '{print $2}')
-  command="ssh $server \"pkill -INT replica\""
-  #echo $command
+  command="ssh $server \"bash $killscript\""
+  echo $command
   eval $command
 done

@@ -76,7 +76,7 @@ public:
                   int replicaIdx);
     void Run();
     int Timer(uint64_t ms, timer_callback_t cb);
-    int DemiTimer(uint64_t ms);
+    int DemiTimer();
     bool CancelTimer(int id);
     void CancelAllTimers();
     

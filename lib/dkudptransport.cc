@@ -223,8 +223,7 @@ DKUDPTransport::Register(TransportReceiver *receiver,
 
     this->replicaIdx = replicaIdx;
 
-    const specpaxos::Configuration *canonicalConfig =
-        RegisterConfiguration(receiver, config, replicaIdx);
+    RegisterConfiguration(receiver, config, replicaIdx);
 
     // Create socket
     int qd = -1;
@@ -376,8 +375,8 @@ DKUDPTransport::Run()
         }
     }
 
-    Debug("Registering the Demikernel timer in libevent; %d tokens.", tokens.size());
-    DemiTimer(10);
+    Debug("Registering the Demikernel timer in libevent; %ld tokens.", tokens.size());
+    DemiTimer();
 
     Debug("Dispatching the libevent base.");
     event_base_dispatch(libeventBase);
@@ -457,13 +456,13 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
 }
 
 int
-DKUDPTransport::DemiTimer(uint64_t ms)
+DKUDPTransport::DemiTimer()
 {
     DKUDPTransportTimerInfo *info = new DKUDPTransportTimerInfo();
 
     struct timeval tv;
-    tv.tv_sec = ms/1000;
-    tv.tv_usec = (ms % 1000) * 1000;
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
     
     info->transport = this;
     info->id = 0;
@@ -548,7 +547,7 @@ DKUDPTransport::OnDemiTimer(DKUDPTransportTimerInfo *info)
     
     CheckQdCallback(info->transport);
 
-    info->transport->DemiTimer(10);
+    info->transport->DemiTimer();
 
     delete info;
 }
