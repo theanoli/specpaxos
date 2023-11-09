@@ -1,4 +1,5 @@
 #!/bin/bash
+source ../../scripts/test_paths.sh
 
 config=$1   # path to config file
 
@@ -14,7 +15,7 @@ for ((i=0; i<$n; i++))
 do
   let line=$i+2 
   server=$(cat $config | sed -n ${line}p | awk -F'[ :]' '{print $2}')
-  command="ssh $server \"cat ~/specpaxos/scripts/passwd | sudo -S killall replica\""
+  command="ssh $server \"cat ${SUDO_PASSWD_FILE} | sudo -S killall replica\""
   #echo $command
   eval $command
 done
