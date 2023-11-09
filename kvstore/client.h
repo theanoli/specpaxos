@@ -16,10 +16,7 @@
 #include "lib/dkudptransport.h"
 #include "common/client.h"
 #include "lib/configuration.h"
-#include "spec/client.h"
-#include "vr/client.h"
 #include "vrw/client.h"
-#include "fastpaxos/client.h"
 #include "kvstore/request.pb.h"
 
 #include <iostream>

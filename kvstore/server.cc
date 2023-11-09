@@ -77,7 +77,8 @@ int
 main(int argc, char **argv)
 {
     int index = -1;
-    const char *configPath = NULL;
+    int nshards = -1;
+    const char *configDir = NULL;
     enum {
         PROTO_UNKNOWN,
         PROTO_VR,
@@ -90,16 +91,16 @@ main(int argc, char **argv)
 
   // Parse arguments
     int opt;
-    while ((opt = getopt(argc, argv, "c:i:m:s")) != -1) {
+    while ((opt = getopt(argc, argv, "n:c:i:m:s")) != -1) {
         switch (opt) {
-			case 's': 
-				// Reads should not be logged but should be consistent
-				Notice("Doing read validation!");
-				validate_reads = true;
-				break; 
+	    case 's': 
+		// Reads should not be logged but should be consistent
+		Notice("Doing read validation!");
+		validate_reads = true;
+		break; 
 
             case 'c':
-                configPath = optarg;
+                configDir = optarg;
                 break;
 
             case 'i':
@@ -117,14 +118,8 @@ main(int argc, char **argv)
 
             case 'm':
             {
-                if (strcasecmp(optarg, "vr") == 0) {
-                    proto = PROTO_VR;
-                } else if (strcasecmp(optarg, "spec") == 0) {
-                    proto = PROTO_SPEC;
-                } else if (strcasecmp(optarg, "vrw") == 0) {
+                if (strcasecmp(optarg, "vrw") == 0) {
                     proto = PROTO_VRW;
-                } else if (strcasecmp(optarg, "fast") == 0) {
-                    proto = PROTO_FAST;
                 } else {
                     fprintf(stderr, "unknown mode '%s'\n", optarg);
                     Usage(argv[0]);
@@ -132,14 +127,33 @@ main(int argc, char **argv)
                 break;
             }
 
+	    case 'n':
+	    {
+                char *strtolPtr;
+                nshards = strtoul(optarg, &strtolPtr, 10);
+                if ((*optarg == '\0') || (*strtolPtr != '\0') || (nshards < 1))
+                {
+                    fprintf(stderr,
+                            "option -n requires a numeric arg >= 1\n");
+                    Usage(argv[0]);
+                }
+
+	        break;
+	    }
+
             default:
                 fprintf(stderr, "Unknown argument %s\n", argv[optind]);
                 break;
         }
     }
 
-    if (!configPath) {
+    if (!configDir) {
         fprintf(stderr, "option -c is required\n");
+        Usage(argv[0]);
+    }
+
+    if (nshards == -1) {
+        fprintf(stderr, "option -n is required\n");
         Usage(argv[0]);
     }
 
@@ -153,63 +167,47 @@ main(int argc, char **argv)
         Usage(argv[0]);
     }
 
-    // Load configuration
-    std::ifstream configStream(configPath);
-    if (configStream.fail()) {
-        fprintf(stderr, "unable to read configuration file: %s\n",
-                configPath);
-        Usage(argv[0]);
-    }
-    specpaxos::Configuration config(configStream);
-
-    if (index >= config.n) {
-        fprintf(stderr, "replica index %d is out of bounds; "
-                "only %d replicas defined\n", index, config.n);
-        Usage(argv[0]);
-    }
-
     DKUDPTransport transport(0.0, 0.0, 0);
+    kvstore::Server server = kvstore::Server();
 
-    specpaxos::Replica *replica;
-    kvstore::Server server;
+    for (int i = 0; i < nshards; i++) {
+        // Load configuration
+        std::string configPath(configDir);
+        configPath = configPath + "/" + std::to_string(i) + ".config";
 
-    switch (proto) {
-        case PROTO_VR:
-			server = kvstore::Server();
-            replica = new specpaxos::vr::VRReplica(config, index, true,
-                                                   &transport, 1, &server);
-            break;
-			
-		case PROTO_VRW:
-			// TODO witness
-			server = kvstore::Server();
-			if (specpaxos::IsWitness(index)) {
-				replica = new specpaxos::vrw::VRWWitness(config, index, true,
-													   &transport, 1, &server);
-			} else {
-				replica = new specpaxos::vrw::VRWReplica(config, index, true,
-													   &transport, 1, &server);
-			}
-            break;
+        std::ifstream configStream(configPath);
+        if (configStream.fail()) {
+            fprintf(stderr, "unable to read configuration file: %s\n",
+                    configPath.c_str());
+            Usage(argv[0]);
+        }
+        specpaxos::Configuration config(configStream);
 
-		case PROTO_SPEC:
-			server = kvstore::Server();
-            replica = new specpaxos::spec::SpecReplica(config, index, true, &transport, &server);
-            break;
+        if (index >= config.n) {
+            fprintf(stderr, "replica index %d is out of bounds; "
+                    "only %d replicas defined\n", index, config.n);
+            Usage(argv[0]);
+        }
 
-        case PROTO_FAST:
-            server = kvstore::Server();
-            replica = new specpaxos::fastpaxos::FastPaxosReplica(config, index, true,
-                                                                 &transport, &server);
-            break;
+        specpaxos::Replica *replica;
 
-        default:
+        if (proto != PROTO_VRW) {
             NOT_REACHABLE();
+        } else {
+            if (specpaxos::IsWitness(index)) {
+                replica = new specpaxos::vrw::VRWWitness(config, index, true, 
+            		    &transport, 1, &server);
+            } else {
+                replica = new specpaxos::vrw::VRWReplica(config, index, true,
+            		    &transport, 1, &server);
+            }
+	    (void)replica;
+        }
     }
     
-	server.SetReadValidation(validate_reads);
+    server.SetReadValidation(validate_reads);
 
-    (void)replica;              // silence warning
+    // (void)replica
     transport.Run();
 
     return 0;

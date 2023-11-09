@@ -41,8 +41,6 @@ Client::Client(const Configuration &config, Transport *transport,
                clientid_t clientid)
     : config(config), transport(transport)
 {
-    this->clientid = clientid;
-
     // Randomly generate a client ID
     // This is surely not the fastest way to get a random 64-bit int,
     // but it should be fine for this purpose.

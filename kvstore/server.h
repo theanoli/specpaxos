@@ -14,11 +14,8 @@
 #include "common/replica.h"
 #include "lib/udptransport.h"
 #include "lib/dkudptransport.h"
-#include "spec/replica.h"
-#include "vr/replica.h"
 #include "vrw/replica.h"
 #include "vrw/witness.h"
-#include "fastpaxos/replica.h"
 #include "kvstore/kvstore.h"
 #include <vector>
 

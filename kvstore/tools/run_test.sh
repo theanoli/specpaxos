@@ -29,7 +29,7 @@ trap 'failure ${LINENO} "$BASH_COMMAND"' ERR
 
 # Paths to source code and logfiles.
 srcdir="$HOME/specpaxos"
-configdir="$srcdir/kvstore/configs/100gb_cluster"
+configdir="$srcdir/kvstore/configs/100gb_cluster_fixed"
 logdir="$HOME/specpaxos/logs"
 keyspath="$HOME/specpaxos/kvstore/tools/keys"
 
@@ -51,7 +51,7 @@ validate_reads=$1
 nclients=$2  # number of client machines to use
 nclient_threads=$3    # number of clients to run (per machine)
 nclient_procs=$((nclients * nclient_threads))
-nshard=1     # number of shards
+nshard=2     # number of shards
 nkeys=1000 # number of keys to use
 rtime=30     # duration to run
 
@@ -96,12 +96,8 @@ replica_cmd="$srcdir/kvstore/replica -m $mode"
 if "$validate_reads"; then 
 	replica_cmd="$replica_cmd -s"
 fi
-for ((i=0; i<$nshard; i++))
-do
-  echo "Starting replicas for $i shards..."
-  $srcdir/kvstore/tools/start_replica.sh shard$i $configdir/shard$i.config \
-    "$replica_cmd" $logdir
-done
+echo "Starting replicas for $i shards..."
+$srcdir/kvstore/tools/start_replica.sh $configdir "$replica_cmd" $logdir
 
 
 # Wait a bit for all replicas to start up

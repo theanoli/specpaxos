@@ -6,8 +6,8 @@ SRCS += $(addprefix $(d), \
 OBJS-benchmark := $(o)benchmark.o \
                   $(LIB-message) $(LIB-latency)
 
-$(d)client: $(o)client.o $(OBJS-spec-client) $(OBJS-vrw-client) $(OBJS-vr-client) $(OBJS-fastpaxos-client) $(OBJS-unreplicated-client) $(OBJS-benchmark) $(LIB-udptransport)
+$(d)client: $(o)client.o $(OBJS-vrw-client) $(OBJS-benchmark) $(LIB-dkudptransport)
 
-$(d)replica: $(o)replica.o $(OBJS-spec-replica) $(OBJS-vrw-replica) $(OBJS-vrw-witness) $(OBJS-vr-replica) $(OBJS-fastpaxos-replica) $(OBJS-unreplicated-replica) $(LIB-udptransport)
+$(d)replica: $(o)replica.o $(OBJS-vrw-replica) $(OBJS-vrw-witness) $(LIB-dkudptransport)
 
 BINS += $(d)client $(d)replica

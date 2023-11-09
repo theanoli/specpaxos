@@ -39,22 +39,10 @@ Client::Client(Proto mode, string configPath, int nShards, int threadIdx,
 
 	shardConfig.setClientAddress(host, port, threadIdx);
 
-        switch (mode) {
-            case PROTO_VR:
-                shard[i] = new specpaxos::vr::VRClient(shardConfig, &transport);
-                break;
-
-            case PROTO_VRW:
-                shard[i] = new specpaxos::vrw::VRWClient(shardConfig, &transport);
-                break;
-            case PROTO_SPEC:
-                shard[i] = new specpaxos::spec::SpecClient(shardConfig, &transport);
-                break;
-            case PROTO_FAST:
-                shard[i] = new specpaxos::fastpaxos::FastPaxosClient(shardConfig, &transport);
-                break;
-            default:
-                NOT_REACHABLE();
+        if (mode != PROTO_VRW) {
+	    NOT_REACHABLE();
+	} else {
+	    shard[i] = new specpaxos::vrw::VRWClient(shardConfig, &transport);
         }
     }
 
@@ -95,6 +83,14 @@ Client::Get(const string &key, string &value)
     request.set_arg0(key);
     request.SerializeToString(&request_str);
 
+    // Choose a client proxy to send the request to the VRW group
+    // This is probably where we'd have another level of client proxies 
+    // available to handle requests concurrently. But we would need to 
+    // deal with the locks; we can possibly have an array of locks, one
+    // for each client proxy. 
+    // Does this work if we only have a single thread doing the client's
+    // work? What would we need to do to handle more threads? Is transport
+    // thread-safe?
     transport.Timer(0, [=]() {
         shard[i]->Invoke(request_str,
                           bind(&Client::getCallback,
@@ -109,6 +105,8 @@ Client::Get(const string &key, string &value)
     Notice("[shard %d] GET reply received", i);
 
     // Reply from shard should be available in "replica_reply".
+    // This is a class variable. We can have an array of these, one for each
+    // client proxy. 
     value = replica_reply;
     return status;
 }
