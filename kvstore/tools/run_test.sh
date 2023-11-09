@@ -133,7 +133,7 @@ do
   fi
 done
 
-
+sleep 5
 # Wait for all clients to exit
 echo "Waiting for client(s) to exit"
 client_count=1
