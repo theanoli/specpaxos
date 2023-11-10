@@ -186,7 +186,7 @@ static int poll_msrs(args_t *poll_args) {
     gettimeofday(&run_time_start, NULL);
     record_t *curr_entry;
     while (1) {
-        printf("Collecting sample\n");
+        //printf("Collecting sample\n");
         curr_entry = &(energy_samples[num_samples]);
         
         gettimeofday(&(curr_entry->timestamp), NULL);
