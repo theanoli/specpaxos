@@ -51,7 +51,7 @@ validate_reads=$1
 nclients=$2  # number of client machines to use
 nclient_threads=$3    # number of clients to run (per machine)
 nclient_procs=$((nclients * nclient_threads))
-nshard=2     # number of shards
+nshard=3     # number of shards
 nkeys=1000 # number of keys to use
 rtime=30     # duration to run
 
@@ -92,11 +92,11 @@ do
 done
 
 
-replica_cmd="$srcdir/kvstore/replica -m $mode"
+replica_cmd="$srcdir/kvstore/replica -m $mode -n $nshard"
 if "$validate_reads"; then 
 	replica_cmd="$replica_cmd -s"
 fi
-echo "Starting replicas for $i shards..."
+echo "Starting replicas for $nshard shards..."
 $srcdir/kvstore/tools/start_replica.sh $configdir "$replica_cmd" $logdir
 
 

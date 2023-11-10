@@ -170,6 +170,7 @@ main(int argc, char **argv)
     DKUDPTransport transport(0.0, 0.0, 0);
     kvstore::Server server = kvstore::Server();
 
+    // TODO give each shard its own thread
     for (int i = 0; i < nshards; i++) {
         // Load configuration
         std::string configPath(configDir);
@@ -192,6 +193,7 @@ main(int argc, char **argv)
         }
 
         specpaxos::Replica *replica;
+	thread *rthread; 
 
         if (proto != PROTO_VRW) {
             NOT_REACHABLE();
@@ -199,9 +201,12 @@ main(int argc, char **argv)
             if (specpaxos::IsWitness(index)) {
                 replica = new specpaxos::vrw::VRWWitness(config, index, true, 
             		    &transport, 1, &server);
+		// TODO there is no way this works
+    		rthread = new thread(&specpaxos::vrw::VRWWitness::ReceiveLoop, replica);
             } else {
                 replica = new specpaxos::vrw::VRWReplica(config, index, true,
             		    &transport, 1, &server);
+    		rthread = new thread(&specpaxos::vrw::VRWReplica::ReceiveLoop, replica);
             }
 	    (void)replica;
         }

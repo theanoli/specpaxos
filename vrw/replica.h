@@ -85,11 +85,12 @@ public:
               AppReplica *app);
     ~VRWReplica();
     
-    void ReceiveMessage(const TransportAddress &remote,
+    void AddToReceiveQueue(const TransportAddress &remote,
                         const string &type, const string &data);
 	size_t GetLogSize();  // For testing
 
 private:
+    std::queue<std::tuple<TrasportAddress *, const string, const string>> receiveQueue; 
     view_t view;
     opnum_t lastCommitted;
     opnum_t lastOp;
@@ -184,6 +185,9 @@ private:
                         const proto::RecoveryMessage &msg);
     void HandleRecoveryResponse(const TransportAddress &remote,
                                 const proto::RecoveryResponseMessage &msg);
+    void ReceiveLoop(); 
+    void ReceiveMessage(const TransportAddress &remote,
+                        const string &type, const string &data);
 };
 
 } // namespace specpaxos::vrw

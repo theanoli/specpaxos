@@ -419,13 +419,13 @@ DecodePacket(const char *buf, size_t sz, string &type, string &msg)
 void
 DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
 {
-	// int qd = qr.qr_qd;
-	demi_sgarray_t *sga = &qr.qr_value.sga;
-	ASSERT(sga->sga_numsegs > 0); 
+    // int qd = qr.qr_qd;
+    demi_sgarray_t *sga = &qr.qr_value.sga;
+    ASSERT(sga->sga_numsegs > 0); 
     
-	// There should only ever be one segment, apparently
-	for (ssize_t i = 0; i < sga->sga_numsegs; i++) {
-		demi_sgaseg_t *seg = &sga->sga_segs[i];
+    // There should only ever be one segment, apparently
+    for (ssize_t i = 0; i < sga->sga_numsegs; i++) {
+	demi_sgaseg_t *seg = &sga->sga_segs[i];
         ssize_t sz = seg->sgaseg_len;
         char *buf = (char *)seg->sgaseg_buf;
         
@@ -433,6 +433,12 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
 	senderAddr.addr.sin_port = htons(senderAddr.addr.sin_port);
 	Debug("Got something to read from %s:%d!",
 		    inet_ntoa(senderAddr.addr.sin_addr), htons(senderAddr.addr.sin_port));
+	// TODO how can we avoid copying the message body twice (once to create this string, 
+	// once to hand it off to the receiver's thread? 
+	// Does it matter? These messages are so small. Maybe just go with it and optimize 
+	// later if the performance is really bad. We can do an easy comparison between 
+	// the single-shard case without threading and the single-shard case with threading
+	// to better understand the performnace hit we may get from this. 
         string msgType, msg;
 
         // Take a peek at the first field. If it's all zeros, this is
@@ -449,7 +455,10 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
             Warning("Received packet with bad magic number");
         }
 
-        receiver->ReceiveMessage(senderAddr, msgType, msg);
+	// TODO here we should push the message onto the receiver's receive queue.
+	// The transport doesn't need to deal with it anymore. 
+	receiver->AddToReceiveQueue(senderAddr, msgType, msg);
+        // receiver->ReceiveMessage(senderAddr, msgType, msg);
     }
     
     demi_sgafree(sga);
@@ -569,6 +578,7 @@ DKUDPTransport::CheckQdCallback(DKUDPTransport *transport)
 		    transport->tokens.data(), transport->tokens.size(), &ts);
     
     // if we got an EOK back from wait
+    // TODO how can we service multiple queue descriptors here? 
     if (status == 0) {
         Debug("Found something: qd=%d", wait_out.qr_qd);
 	// process request

@@ -14,11 +14,14 @@ fi
 n=$(head -n1 $configdir/shard0.config | awk '{print $2}')  # There should at least be a shard0
 let n=2*$n+1  # Count of replica machines
 
+echo "Starting replicas on $n machines; config dir: $configdir"
+
 # SSH into each replica machine to start one process running nshard shards
 for ((i=0; i<$n; i++))
 do
   let line=$i+2 
-  server=$(cat $config | sed -n ${line}p | awk -F'[ :]' '{print $2}')
+  server=$(cat $configdir/shard0.config | sed -n ${line}p | awk -F'[ :]' '{print $2}')
+  echo "Working on server $server"
   command="ssh $server \"mkdir -p $logdir; \
 	  source $HOME/specpaxos/kvstore/tools/set_demi_env.sh; \
 	  cat $passwdfile | sudo -SE nice -n -999 taskset -c 0 $cmd -c $configdir -i $i > \
