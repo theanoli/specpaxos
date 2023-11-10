@@ -449,7 +449,8 @@ VRWReplica::CloseBatch()
 void
 VRWReplica::LaunchReceiveThread()
 {
-    std::thread(&VRWReplica::ReceiveLoop, this);
+    std::thread t(&VRWReplica::ReceiveLoop, this);
+    t.detach();
 }
 
 // This will run forever, checking the receive queue for messages. 
@@ -955,7 +956,7 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
 	 * and then update as replicas make progress.
 	 */
 	try {
-		opnum_t replicaLastRecordedCommit = lastCommitteds.at(msg.replicaidx());
+		[[maybe_unused]] opnum_t replicaLastRecordedCommit = lastCommitteds.at(msg.replicaidx());
 		ASSERT(replicaLastRecordedCommit <= msg.lastcommitted());
 		lastCommitteds.at(msg.replicaidx()) = msg.lastcommitted();
 	} catch (std::out_of_range const& exc) {
@@ -1106,7 +1107,7 @@ VRWReplica::HandleStateTransfer(const TransportAddress &remote,
         } else if (newEntry.opnum() <= lastOp) {
             // We already have an entry with this opnum, but maybe
             // it's from an older view?
-            const LogEntry *entry = log.Find(newEntry.opnum());
+            [[maybe_unused]] const LogEntry *entry = log.Find(newEntry.opnum());
             ASSERT(entry->viewstamp.opnum == newEntry.opnum());
             ASSERT(entry->viewstamp.view <= newEntry.view());
             
