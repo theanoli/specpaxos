@@ -174,6 +174,8 @@ main(int argc, char **argv)
         // Load configuration
         std::string configPath(configDir);
         configPath = configPath + "/shard" + std::to_string(i) + ".config";
+	fprintf(stdout, "Spawning shard %d on replica %d, config dir %s\n", 
+			i, index, configPath);
 
         std::ifstream configStream(configPath);
         if (configStream.fail()) {
