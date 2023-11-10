@@ -383,7 +383,7 @@ int main(int argc, char **argv) {
             case 'm': {
                 char *strtolPtr;
                 args.monitor_pkg = strtoul(optarg, &strtolPtr, 10);
-                if ((*optarg != '\0') || (*strtolPtr != '\0')) {
+                if ((*optarg == '\0') || (*strtolPtr != '\0')) {
                     fprintf(stderr, "option -m must be an integer\n");
                 }
                 if (args.monitor_pkg < 0 || args.monitor_pkg >= total_packages) {
