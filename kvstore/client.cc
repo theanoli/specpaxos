@@ -37,7 +37,7 @@ Client::Client(Proto mode, string configPath, int nShards, int threadIdx,
         }
         specpaxos::Configuration shardConfig(shardConfigStream);
 
-	shardConfig.setClientAddress(host, port, threadIdx);
+	shardConfig.setClientAddress(host, port + i, threadIdx);
 
         if (mode != PROTO_VRW) {
 	    NOT_REACHABLE();
