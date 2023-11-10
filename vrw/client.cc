@@ -137,7 +137,6 @@ VRWClient::ResendRequest()
     SendRequest();
 }
 
-
 void
 VRWClient::ReceiveMessage(const TransportAddress &remote,
                          const string &type,

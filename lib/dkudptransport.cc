@@ -455,10 +455,7 @@ DKUDPTransport::OnReadable(demi_qresult_t &qr, TransportReceiver *receiver)
             Warning("Received packet with bad magic number");
         }
 
-	// TODO here we should push the message onto the receiver's receive queue.
-	// The transport doesn't need to deal with it anymore. 
-	receiver->AddToReceiveQueue(senderAddr, msgType, msg);
-        // receiver->ReceiveMessage(senderAddr, msgType, msg);
+        receiver->ReceiveMessage(senderAddr, msgType, msg);
     }
     
     demi_sgafree(sga);

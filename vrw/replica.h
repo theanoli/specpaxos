@@ -39,9 +39,11 @@
 #include "vrw/vrw-proto.pb.h"
 
 #include <limits>
+#include <list>
 #include <map>
 #include <memory>
-#include <list>
+#include <queue>
+#include <thread>
 
 namespace specpaxos {
 namespace vrw {
@@ -85,12 +87,13 @@ public:
               AppReplica *app);
     ~VRWReplica();
     
-    void AddToReceiveQueue(const TransportAddress &remote,
+    void LaunchReceiveThread();
+    void ReceiveMessage(const TransportAddress &remote,
                         const string &type, const string &data);
 	size_t GetLogSize();  // For testing
 
 private:
-    std::queue<std::tuple<TrasportAddress *, const string, const string>> receiveQueue; 
+    std::queue<std::tuple<std::unique_ptr<TransportAddress>, const string, const string>> receiveQueue; 
     view_t view;
     opnum_t lastCommitted;
     opnum_t lastOp;
@@ -185,9 +188,9 @@ private:
                         const proto::RecoveryMessage &msg);
     void HandleRecoveryResponse(const TransportAddress &remote,
                                 const proto::RecoveryResponseMessage &msg);
-    void ReceiveLoop(); 
-    void ReceiveMessage(const TransportAddress &remote,
+    void ProcessReceivedMessage(const TransportAddress &remote,
                         const string &type, const string &data);
+    void ReceiveLoop(); 
 };
 
 } // namespace specpaxos::vrw

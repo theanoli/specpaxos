@@ -40,6 +40,7 @@
 
 #include <algorithm>
 #include <random>
+#include <thread>
 
 #define RDebug(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RNotice(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
@@ -258,7 +259,33 @@ VRWWitness::StartViewChange(view_t newview)
 }
 
 void
+VRWWitness::LaunchReceiveThread()
+{
+    std::thread(&VRWWitness::ReceiveLoop, this);
+}
+
+void
+VRWWitness::ReceiveLoop()
+{
+    while (true) {
+	while (receiveQueue.size() > 0) {
+	    auto next = std::move(receiveQueue.front());
+	    ProcessReceivedMessage(*std::get<0>(next), std::get<1>(next), std::get<2>(next));
+	    receiveQueue.pop();
+	}
+    }
+}
+
+void
 VRWWitness::ReceiveMessage(const TransportAddress &remote,
+                          const string &type, const string &data)
+{
+    receiveQueue.push({std::unique_ptr<TransportAddress>(remote.clone()), 
+		    type, data});
+}
+
+void
+VRWWitness::ProcessReceivedMessage(const TransportAddress &remote, 
                           const string &type, const string &data)
 {
     static RequestMessage request;
@@ -540,7 +567,7 @@ VRWWitness::HandleStateTransfer(const TransportAddress &remote,
         if (newEntry.opnum() <= lastCommitted) {
             // Already committed this operation; nothing to be done.
 #if PARANOID
-            const LogEntry *entry = log.Find(newEntry.opnum());
+            [[maybe_unused]] const LogEntry *entry = log.Find(newEntry.opnum());
             ASSERT(entry->viewstamp.opnum == newEntry.opnum());
             ASSERT(entry->viewstamp.view == newEntry.view());
 //          ASSERT(entry->request == newEntry.request());

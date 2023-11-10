@@ -17,6 +17,8 @@
 #include "vrw/replica.h"
 #include "vrw/witness.h"
 #include "kvstore/kvstore.h"
+
+#include <functional>
 #include <vector>
 
 namespace kvstore {

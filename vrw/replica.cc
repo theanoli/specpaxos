@@ -446,13 +446,10 @@ VRWReplica::CloseBatch()
 	}
 }
 
-// TODO how should we pull things off of this queue? 
-// TODO what about receiving? 
 void
-VRWReplica::AddToReceiveQueue(const TransportAddress &remote,
-                          const string &type, const string &data)
+VRWReplica::LaunchReceiveThread()
 {
-    receiveQueue.push_back({remote, type, data});
+    std::thread(&VRWReplica::ReceiveLoop, this);
 }
 
 // This will run forever, checking the receive queue for messages. 
@@ -460,19 +457,25 @@ VRWReplica::AddToReceiveQueue(const TransportAddress &remote,
 void
 VRWReplica::ReceiveLoop()
 {
-    std::string message;
-    std::string type; 
-    TransportAddress remote; 
     while (true) {
 	while (receiveQueue.size() > 0) {
-	    std::tie(remote, type, data) = receiveQueue.pop_front();
-	    ReceiveMessage(remote, type, data);
+	    auto next = std::move(receiveQueue.front());
+	    ProcessReceivedMessage(*std::get<0>(next), std::get<1>(next), std::get<2>(next));
+	    receiveQueue.pop();
 	}
     }
 }
 
 void
 VRWReplica::ReceiveMessage(const TransportAddress &remote,
+                          const string &type, const string &data)
+{
+    receiveQueue.push({std::unique_ptr<TransportAddress>(remote.clone()), 
+		    type, data});
+}
+
+void
+VRWReplica::ProcessReceivedMessage(const TransportAddress &remote, 
                           const string &type, const string &data)
 {
     static RequestMessage request;

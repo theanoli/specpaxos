@@ -209,7 +209,7 @@ main(int argc, char **argv)
     double getLatency = 0.0;
     int putCount = 0;
     double putLatency = 0.0;
-	bool status;
+    [[maybe_unused]] bool status;
 
     gettimeofday(&t0, NULL);
     srand(t0.tv_sec + t0.tv_usec);

@@ -176,7 +176,7 @@ main(int argc, char **argv)
         std::string configPath(configDir);
         configPath = configPath + "/shard" + std::to_string(i) + ".config";
 	fprintf(stdout, "Spawning shard %d on replica %d, config dir %s\n", 
-			i, index, configPath);
+			i, index, configPath.c_str());
 
         std::ifstream configStream(configPath);
         if (configStream.fail()) {
@@ -192,23 +192,23 @@ main(int argc, char **argv)
             Usage(argv[0]);
         }
 
-        specpaxos::Replica *replica;
-	thread *rthread; 
+
+	// Do we need to save the thread pointer? At this point we are killing the 
+	// replicas with kill command on command line
+	[[maybe_unused]] std::thread *rthread; 
 
         if (proto != PROTO_VRW) {
             NOT_REACHABLE();
         } else {
             if (specpaxos::IsWitness(index)) {
-                replica = new specpaxos::vrw::VRWWitness(config, index, true, 
-            		    &transport, 1, &server);
-		// TODO there is no way this works
-    		rthread = new thread(&specpaxos::vrw::VRWWitness::ReceiveLoop, replica);
+                specpaxos::vrw::VRWWitness *witness = new specpaxos::vrw::VRWWitness(
+				config, index, true, &transport, 1, &server);
+		witness->LaunchReceiveThread();
             } else {
-                replica = new specpaxos::vrw::VRWReplica(config, index, true,
-            		    &transport, 1, &server);
-    		rthread = new thread(&specpaxos::vrw::VRWReplica::ReceiveLoop, replica);
+                specpaxos::vrw::VRWReplica *replica = new specpaxos::vrw::VRWReplica(
+				config, index, true, &transport, 1, &server);
+		replica->LaunchReceiveThread();
             }
-	    (void)replica;
         }
     }
     
