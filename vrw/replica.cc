@@ -458,6 +458,7 @@ VRWReplica::LaunchReceiveThread()
 void
 VRWReplica::ReceiveLoop()
 {
+    RNotice("About to enter the receive loop");
     while (true) {
 	while (receiveQueue.size() > 0) {
 	    auto next = std::move(receiveQueue.front());
@@ -1099,7 +1100,7 @@ VRWReplica::HandleStateTransfer(const TransportAddress &remote,
         if (newEntry.opnum() <= lastCommitted) {
             // Already committed this operation; nothing to be done.
 #if PARANOID
-            const LogEntry *entry = log.Find(newEntry.opnum());
+            [[maybe_unused]] const LogEntry *entry = log.Find(newEntry.opnum());
             ASSERT(entry->viewstamp.opnum == newEntry.opnum());
             ASSERT(entry->viewstamp.view == newEntry.view());
 //          ASSERT(entry->request == newEntry.request());
@@ -1107,7 +1108,7 @@ VRWReplica::HandleStateTransfer(const TransportAddress &remote,
         } else if (newEntry.opnum() <= lastOp) {
             // We already have an entry with this opnum, but maybe
             // it's from an older view?
-            [[maybe_unused]] const LogEntry *entry = log.Find(newEntry.opnum());
+            const LogEntry *entry = log.Find(newEntry.opnum());
             ASSERT(entry->viewstamp.opnum == newEntry.opnum());
             ASSERT(entry->viewstamp.view <= newEntry.view());
             

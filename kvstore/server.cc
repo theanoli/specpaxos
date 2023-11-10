@@ -185,6 +185,8 @@ main(int argc, char **argv)
             Usage(argv[0]);
         }
         specpaxos::Configuration config(configStream);
+	fprintf(stdout, "Configuration parsing complete...\n");
+	fflush(stdout);
 
         if (index >= config.n) {
             fprintf(stderr, "replica index %d is out of bounds; "
@@ -192,29 +194,31 @@ main(int argc, char **argv)
             Usage(argv[0]);
         }
 
-
 	// Do we need to save the thread pointer? At this point we are killing the 
 	// replicas with kill command on command line
-	[[maybe_unused]] std::thread *rthread; 
-
+	fprintf(stdout, "Deciding if it's a replica or a witness...\n");
+	fflush(stdout);
         if (proto != PROTO_VRW) {
             NOT_REACHABLE();
         } else {
             if (specpaxos::IsWitness(index)) {
+		fprintf(stdout, "Creating a witness thread\n");
                 specpaxos::vrw::VRWWitness *witness = new specpaxos::vrw::VRWWitness(
 				config, index, true, &transport, 1, &server);
 		witness->LaunchReceiveThread();
             } else {
+		fprintf(stdout, "Creating a replica thread\n");
                 specpaxos::vrw::VRWReplica *replica = new specpaxos::vrw::VRWReplica(
 				config, index, true, &transport, 1, &server);
 		replica->LaunchReceiveThread();
             }
         }
+	fflush(stdout);
     }
     
     server.SetReadValidation(validate_reads);
 
-    // (void)replica
+    fprintf(stdout, "Running the transport layer\n");
     transport.Run();
 
     return 0;
