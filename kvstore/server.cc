@@ -173,7 +173,7 @@ main(int argc, char **argv)
     for (int i = 0; i < nshards; i++) {
         // Load configuration
         std::string configPath(configDir);
-        configPath = configPath + "/" + std::to_string(i) + ".config";
+        configPath = configPath + "/shard" + std::to_string(i) + ".config";
 
         std::ifstream configStream(configPath);
         if (configStream.fail()) {
