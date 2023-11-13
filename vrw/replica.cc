@@ -450,7 +450,7 @@ void
 VRWReplica::LaunchReceiveThread()
 {
     std::thread *t = new std::thread(&VRWReplica::ReceiveLoop, this);
-    t.detach();
+    t->detach();
 }
 
 // This will run forever, checking the receive queue for messages. 
