@@ -449,7 +449,7 @@ VRWReplica::CloseBatch()
 void
 VRWReplica::LaunchReceiveThread()
 {
-    std::thread t(&VRWReplica::ReceiveLoop, this);
+    std::thread *t = new std::thread(&VRWReplica::ReceiveLoop, this);
     t.detach();
 }
 
