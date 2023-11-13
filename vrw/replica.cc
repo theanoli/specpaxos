@@ -462,6 +462,7 @@ VRWReplica::ReceiveLoop()
     while (true) {
 	while (receiveQueue.size() > 0) {
 	    auto next = std::move(receiveQueue.front());
+	    Notice("Processing a message: %s", std::get<1>(next));
 	    ProcessReceivedMessage(*std::get<0>(next), std::get<1>(next), std::get<2>(next));
 	    receiveQueue.pop();
 	}

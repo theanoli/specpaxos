@@ -43,6 +43,7 @@ clients=("198.0.0.1" "198.0.0.11")  # 100gb
 # clients=("10.100.1.10" "10.100.1.4")
 #clients=("localhost" "localhost")
 # clients=("localhost")
+nodesByName=("muffin" "marin" "cupcake" "sonoma" "helong")
 
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 mode="vrw"            # Mode for replicas.
@@ -51,7 +52,7 @@ validate_reads=$1
 nclients=$2  # number of client machines to use
 nclient_threads=$3    # number of clients to run (per machine)
 nclient_procs=$((nclients * nclient_threads))
-nshard=3     # number of shards
+nshard=1     # number of shards
 nkeys=1000 # number of keys to use
 rtime=30     # duration to run
 
@@ -138,9 +139,9 @@ done
 
 # Kill all replicas
 echo "Cleaning up"
-for ((i=0; i<$nshard; i++))
+for host in ${nodesByName[@]}
 do
-  $srcdir/kvstore/tools/stop_replica.sh $configdir/shard$i.config > /dev/null 2>&1
+  $srcdir/kvstore/tools/stop_replica.sh $host > /dev/null 2>&1
 done
 
 
