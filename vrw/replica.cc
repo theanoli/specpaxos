@@ -446,11 +446,10 @@ VRWReplica::CloseBatch()
 	}
 }
 
-void
+std::thread *
 VRWReplica::LaunchReceiveThread()
 {
-    std::thread *t = new std::thread(&VRWReplica::ReceiveLoop, this);
-    t->detach();
+    return new std::thread(&VRWReplica::ReceiveLoop, this);
 }
 
 // This will run forever, checking the receive queue for messages. 

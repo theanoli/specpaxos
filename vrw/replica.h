@@ -87,7 +87,7 @@ public:
               AppReplica *app);
     ~VRWReplica();
     
-    void LaunchReceiveThread();
+    std::thread *LaunchReceiveThread();
     void ReceiveMessage(const TransportAddress &remote,
                         const string &type, const string &data);
 	size_t GetLogSize();  // For testing

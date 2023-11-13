@@ -258,11 +258,10 @@ VRWWitness::StartViewChange(view_t newview)
     }
 }
 
-void
+std::thread *
 VRWWitness::LaunchReceiveThread()
 {
-    std::thread t(&VRWWitness::ReceiveLoop, this);
-    t.detach();
+    return new std::thread(&VRWWitness::ReceiveLoop, this);
 }
 
 void

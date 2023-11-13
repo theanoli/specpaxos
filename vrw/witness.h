@@ -43,6 +43,7 @@
 #include <map>
 #include <memory>
 #include <queue>
+#include <thread>
 
 namespace specpaxos {
 namespace vrw {
@@ -55,7 +56,7 @@ public:
               AppReplica *app);
     ~VRWWitness();
     
-    void LaunchReceiveThread();
+    std::thread *LaunchReceiveThread();
     void ReceiveMessage(const TransportAddress &remote,
                         const string &type, const string &data);
 	size_t GetLogSize();  // For testing

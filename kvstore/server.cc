@@ -201,17 +201,19 @@ main(int argc, char **argv)
         if (proto != PROTO_VRW) {
             NOT_REACHABLE();
         } else {
+	    std::thread *t;
             if (specpaxos::IsWitness(index)) {
 		fprintf(stdout, "Creating a witness thread\n");
                 specpaxos::vrw::VRWWitness *witness = new specpaxos::vrw::VRWWitness(
 				config, index, true, &transport, 1, &server);
-		witness->LaunchReceiveThread();
+		t = witness->LaunchReceiveThread();
             } else {
 		fprintf(stdout, "Creating a replica thread\n");
                 specpaxos::vrw::VRWReplica *replica = new specpaxos::vrw::VRWReplica(
 				config, index, true, &transport, 1, &server);
-		replica->LaunchReceiveThread();
+		t = replica->LaunchReceiveThread();
             }
+	    t->join();
         }
 	fflush(stdout);
     }
