@@ -171,6 +171,7 @@ main(int argc, char **argv)
     kvstore::Server server = kvstore::Server();
 
     // TODO give each shard its own thread
+    std::vector<std::thread *> threads; 
     for (int i = 0; i < nshards; i++) {
         // Load configuration
         std::string configPath(configDir);
@@ -213,7 +214,7 @@ main(int argc, char **argv)
 				config, index, true, &transport, 1, &server);
 		t = replica->LaunchReceiveThread();
             }
-	    t->join();
+	    threads.push_back(t);
         }
 	fflush(stdout);
     }
@@ -222,7 +223,9 @@ main(int argc, char **argv)
 
     fprintf(stdout, "Running the transport layer\n");
     transport.Run();
-
+    for (auto t : threads) {
+	t->join();
+    }
     return 0;
 }
 
