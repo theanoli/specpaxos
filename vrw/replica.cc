@@ -445,6 +445,12 @@ VRWReplica::CloseBatch()
 	}
 }
 
+static void usleep_spin(uint64_t t) {
+	auto start = std::chrono::high_resolution_clock::now();
+	while(std::chrono::high_resolution_clock::now()-start < std::chrono::nanoseconds(t))
+	    ;
+}
+
 void
 VRWReplica::ReceiveMessage(const TransportAddress &remote,
                           const string &type, const string &data)
@@ -464,6 +470,13 @@ VRWReplica::ReceiveMessage(const TransportAddress &remote,
     static RecoveryMessage recovery;
     static RecoveryResponseMessage recoveryResponse;
     
+#ifdef SLOWDOWN_REPLICA_TIME
+    if (!AmLeader()) usleep_spin(SLOWDOWN_REPLICA_TIME);
+#endif
+#ifdef SLOWDOWN_LEADER_TIME
+    if (AmLeader()) usleep_spin(SLOWDOWN_LEADER_TIME);
+#endif
+
     if (type == request.GetTypeName()) {
         request.ParseFromString(data);
         HandleRequest(remote, request);
