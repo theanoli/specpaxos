@@ -168,12 +168,12 @@ main(int argc, char **argv)
     }
 
     DKUDPTransport transport(0.0, 0.0, 0);
-    kvstore::Server server = kvstore::Server();
 
     // TODO give each shard its own thread
     std::vector<std::thread *> threads; 
     for (int i = 0; i < nshards; i++) {
         // Load configuration
+	kvstore::Server *server = new kvstore::Server();
         std::string configPath(configDir);
         configPath = configPath + "/shard" + std::to_string(i) + ".config";
 	fprintf(stdout, "Spawning shard %d on replica %d, config dir %s\n", 
@@ -206,12 +206,12 @@ main(int argc, char **argv)
             if (specpaxos::IsWitness(index)) {
 		fprintf(stdout, "Creating a witness thread\n");
                 specpaxos::vrw::VRWWitness *witness = new specpaxos::vrw::VRWWitness(
-				config, index, true, &transport, 1, &server);
+				config, index, true, &transport, 1, server);
 		t = witness->LaunchReceiveThread();
             } else {
 		fprintf(stdout, "Creating a replica thread\n");
                 specpaxos::vrw::VRWReplica *replica = new specpaxos::vrw::VRWReplica(
-				config, index, true, &transport, 1, &server);
+				config, index, true, &transport, 1, server);
 		t = replica->LaunchReceiveThread();
             }
 	    threads.push_back(t);
