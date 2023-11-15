@@ -174,6 +174,8 @@ main(int argc, char **argv)
     for (int i = 0; i < nshards; i++) {
         // Load configuration
 	kvstore::Server *server = new kvstore::Server();
+	server->SetReadValidation(validate_reads);
+
         std::string configPath(configDir);
         configPath = configPath + "/shard" + std::to_string(i) + ".config";
 	fprintf(stdout, "Spawning shard %d on replica %d, config dir %s\n", 
@@ -219,7 +221,6 @@ main(int argc, char **argv)
 	fflush(stdout);
     }
     
-    server.SetReadValidation(validate_reads);
 
     fprintf(stdout, "Running the transport layer\n");
     transport.Run();
