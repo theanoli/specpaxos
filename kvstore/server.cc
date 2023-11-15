@@ -215,6 +215,15 @@ main(int argc, char **argv)
 		t = replica->LaunchReceiveThread();
             }
 	    threads.push_back(t);
+
+	    cpu_set_t cpuset;
+	    CPU_ZERO(&cpuset);
+	    CPU_SET(i + 1, &cpuset);
+	    int rc = pthread_setaffinity_np(t->native_handle(),
+					    sizeof(cpu_set_t), &cpuset);
+	    if (rc != 0) {
+	      std::cerr << "Error calling pthread_setaffinity_np: " << rc << "\n";
+	    }
         }
 	fflush(stdout);
     }
@@ -222,6 +231,7 @@ main(int argc, char **argv)
     server.SetReadValidation(validate_reads);
 
     fprintf(stdout, "Running the transport layer\n");
+    fflush(stdout);
     transport.Run();
     for (auto t : threads) {
 	t->join();

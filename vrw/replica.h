@@ -191,6 +191,9 @@ private:
     void ProcessReceivedMessage(const TransportAddress &remote,
                         const string &type, const string &data);
     void ReceiveLoop(); 
+    void SendMessageToAll(const Message &p);
+    void SendMessage(const TransportAddress &remote, const Message &p);
+    void SendMessageToReplica(int replicaIdx, const Message &p);
 };
 
 } // namespace specpaxos::vrw
