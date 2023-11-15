@@ -587,8 +587,10 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
             // discard the request.
             if (entry.replied) {
                 RNotice("Received duplicate request; resending reply");
+		string host = transport->get_host(remote);
+		string port = transport->get_port(remote);
 		transport->Timer(0, [=]() {
-		    transport->SendMessage(this, remote, entry.reply);
+		    transport->SendMessage(this, host, port, entry.reply);
 		});
                 Latency_EndType(&requestLatency, 'r');
                 return;

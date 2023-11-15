@@ -79,6 +79,8 @@ public:
     int DemiTimer();
     bool CancelTimer(int id);
     void CancelAllTimers();
+    std::string get_port(const DKUDPTransportAddress &addr);
+    std::string get_host(const DKUDPTransportAddress &addr);
     
 private:
     int acceptQD;
@@ -134,6 +136,8 @@ private:
                   int replicaIdx);
     const DKUDPTransportAddress *
     LookupMulticastAddress(const specpaxos::Configuration *cfg);
+    DKUDPTransportAddress
+    LookupAddress(const string &host, const string &port); 
     void OnTimer(DKUDPTransportTimerInfo *info);
     void OnDemiTimer(DKUDPTransportTimerInfo *info);
     void OnReadable(demi_qresult_t &qr, TransportReceiver *receiver);

@@ -49,6 +49,8 @@ class UDPTransportAddress : public TransportAddress
 {
 public:
     UDPTransportAddress * clone() const;
+    std::string get_port();
+    std::string get_host();
 private:
     UDPTransportAddress(const sockaddr_in &addr);
     sockaddr_in addr;

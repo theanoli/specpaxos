@@ -71,6 +71,18 @@ UDPTransportAddress::clone() const
     return c;    
 }
 
+string
+DKUDPTransportAddress::get_host()
+{
+    return inet_ntoa(addr.sin_addr); 
+}
+
+string
+DKUDPTransportAddress::get_port()
+{
+    return htons(addr.sin_port); 
+}
+
 bool operator==(const UDPTransportAddress &a, const UDPTransportAddress &b)
 {
     return (memcmp(&a.addr, &b.addr, sizeof(a.addr)) == 0);

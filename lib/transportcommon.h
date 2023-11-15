@@ -65,6 +65,14 @@ public:
     }
 
     virtual bool
+    SendMessage(TransportReceiver *src, const string &host, const string &port,
+                const Message &m)
+    {
+        const ADDR &dstAddr = LookupAddress(host, port);
+        return SendMessageInternal(src, dstAddr, m, false);
+    }
+
+    virtual bool
     SendMessageToReplica(TransportReceiver *src, int replicaIdx,
                          const Message &m)
     {
@@ -109,7 +117,7 @@ public:
             return true;
         }
     }
-    
+
 protected:
     virtual bool SendMessageInternal(TransportReceiver *src,
                                      const ADDR &dst,
@@ -117,6 +125,7 @@ protected:
                                      bool multicast = false) = 0;
     virtual ADDR LookupAddress(const specpaxos::Configuration &cfg,
                                int replicaIdx) = 0;
+    virtual ADDR LookupAddress(const string &host, const string &port) = 0;
     virtual const ADDR *
     LookupMulticastAddress(const specpaxos::Configuration *cfg) = 0;
 

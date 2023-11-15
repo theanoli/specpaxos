@@ -88,6 +88,41 @@ bool operator<(const DKUDPTransportAddress &a, const DKUDPTransportAddress &b)
     return (memcmp(&a.addr, &b.addr, sizeof(a.addr)) < 0);
 }
 
+string
+DKUDPTransport::get_host()
+{
+    return inet_ntoa(addr.sin_addr); 
+}
+
+string
+DKUDPTransport::get_port()
+{
+    return std::to_string(htons(addr.sin_port)); 
+}
+
+DKUDPTransportAddress
+DKUDPTransport::LookupAddress(const string &host, const string &port)
+{
+    int res;
+    struct addrinfo hints;
+    hints.ai_family   = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = 0;
+    hints.ai_flags    = 0;
+    struct addrinfo *ai;
+    if ((res = getaddrinfo(host.c_str(), port.c_str(), &hints, &ai))) {
+        Panic("Failed to resolve %s:%s: %s",
+              host.c_str(), port.c_str(), gai_strerror(res));
+    }
+    if (ai->ai_addr->sa_family != AF_INET) {
+        Panic("getaddrinfo returned a non IPv4 address");
+    }
+    DKUDPTransportAddress out =
+              DKUDPTransportAddress(*((sockaddr_in *)ai->ai_addr));
+    freeaddrinfo(ai);
+    return out;
+}
+
 DKUDPTransportAddress
 DKUDPTransport::LookupAddress(const specpaxos::ReplicaAddress &addr)
 {
