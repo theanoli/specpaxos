@@ -1,6 +1,11 @@
 #!/bin/bash
+if [ $# -ne 1 ]; then 
+    echo "Usage: set_irqs <devname>"
+fi
 
-IRQS=$(cat /proc/interrupts | grep ens1f0np0 | cut -d ":" -f1)
+DEV_NAME=$1
+
+IRQS=$(cat /proc/interrupts | grep ${DEV_NAME} | cut -d ":" -f1)
 
 bitshift=0
 lower=1
