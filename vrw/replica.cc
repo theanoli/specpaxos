@@ -462,7 +462,6 @@ VRWReplica::ReceiveLoop()
 {
     RNotice("About to enter the receive loop");
     while (true) {
-        RNotice("Checking for messages");
 	while (receiveQueue.size() > 0) {
 	    auto next = std::move(receiveQueue.front());
 	    RNotice("Processing a message: %s", std::get<1>(next).c_str());
