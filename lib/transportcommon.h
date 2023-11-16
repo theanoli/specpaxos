@@ -118,6 +118,19 @@ public:
         }
     }
 
+    string
+    get_host(const TransportAddress &addr)
+    {
+	return ""; 
+    }
+    
+    string
+    get_port(const TransportAddress &addr)
+    {
+        return ""; 
+    }
+
+
 protected:
     virtual bool SendMessageInternal(TransportReceiver *src,
                                      const ADDR &dst,
@@ -202,18 +215,6 @@ protected:
         }
         
         replicaAddressesInitialized = true;
-    }
-
-    virtual string
-    get_host(const TransportAddress &addr)
-    {
-	return ""; 
-    }
-
-    virtual string
-    get_port(const TransportAddress &addr)
-    {
-	return ""; 
     }
 };
 

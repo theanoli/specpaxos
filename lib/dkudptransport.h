@@ -79,8 +79,8 @@ public:
     int DemiTimer();
     bool CancelTimer(int id);
     void CancelAllTimers();
-    string get_host(const DKUDPTransportAddress &addr);
-    string get_port(const DKUDPTransportAddress &addr);
+    string get_host(const TransportAddress &addr) override;
+    string get_port(const TransportAddress &addr) override;
     
 private:
     int acceptQD;
