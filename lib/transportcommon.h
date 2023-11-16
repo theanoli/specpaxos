@@ -203,6 +203,18 @@ protected:
         
         replicaAddressesInitialized = true;
     }
+
+    virtual string
+    get_host(const TransportAddress &addr)
+    {
+	return ""; 
+    }
+
+    virtual string
+    get_port(const TransportAddress &addr)
+    {
+	return ""; 
+    }
 };
 
 #endif // _LIB_TRANSPORTCOMMON_H_

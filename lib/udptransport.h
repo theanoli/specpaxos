@@ -76,6 +76,8 @@ public:
     int Timer(uint64_t ms, timer_callback_t cb);
     bool CancelTimer(int id);
     void CancelAllTimers();
+    string get_host(const UDPTransportAddress &addr);
+    string get_port(const UDPTransportAddress &addr);
     
 private:
     struct UDPTransportTimerInfo

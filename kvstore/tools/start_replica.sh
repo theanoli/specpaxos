@@ -24,7 +24,7 @@ do
   echo "Working on server $server"
   command="ssh $server \"mkdir -p $logdir; \
 	  source $HOME/specpaxos/kvstore/tools/set_demi_env.sh; \
-	  cat $passwdfile | sudo -SE nice -n -999 $cmd -c $configdir -i $i > \
+	  cat $passwdfile | sudo -SE DEBUG=$HOME/specpaxos/vrw/replica.cc $cmd -c $configdir -i $i > \
 	  $logdir/replica$i.log 2>&1 &\""
   echo $command
   eval $command

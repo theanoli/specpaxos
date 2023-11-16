@@ -216,8 +216,10 @@ VRWReplica::CommitUpTo(opnum_t upto)
 			/* Send reply */
 			auto iter = clientAddresses.find(entry->request.clientid());
 			if (iter != clientAddresses.end()) {
+			    string host = transport->get_host(*iter->second);
+			    string port = transport->get_port(*iter->second);
 			    transport->Timer(0, [=]() {
-				transport->SendMessage(this, *iter->second, reply);
+				transport->SendMessage(this, host, port, reply);
 			    });
 			}
 		}
@@ -707,8 +709,10 @@ VRWReplica::HandleValidateRequest(const TransportAddress &remote,
     reply.set_clientreqid(msg.clientreqid());
 
 	RDebug("Sending validate response to leader");
+    string host = transport->get_host(remote);
+    string port = transport->get_port(remote);
     transport->Timer(0, [=]() {
-	transport->SendMessage(this, remote, reply);
+	transport->SendMessage(this, host, port, reply);
     });
 }
 
@@ -769,8 +773,10 @@ VRWReplica::HandleValidateReply(const TransportAddress &remote,
 		/* Send reply */
 		auto iter = clientAddresses.find(msg.clientid());
 		if (iter != clientAddresses.end()) {
+		    string host = transport->get_host(*iter->second);
+		    string port = transport->get_port(*iter->second);
 		    transport->Timer(0, [=]() {
-			transport->SendMessage(this, *iter->second, cte.reply);
+			transport->SendMessage(this, host, port, cte.reply);
 		    });
 		}
     }
@@ -813,8 +819,10 @@ VRWReplica::HandleUnloggedRequest(const TransportAddress &remote,
 
     ExecuteUnlogged(msg.req(), reply);
     
+    string host = transport->get_host(remote);
+    string port = transport->get_port(remote);
     transport->Timer(0, [=]() {
-	transport->SendMessage(this, remote, reply);
+	transport->SendMessage(this, host, port, reply);
     });
 }
 
@@ -1081,8 +1089,10 @@ VRWReplica::HandleRequestStateTransfer(const TransportAddress &remote,
     
     log.Dump(msg.opnum()+1, reply.mutable_entries());
 
+    string host = transport->get_host(remote);
+    string port = transport->get_port(remote);
     transport->Timer(0, [=]() {
-	transport->SendMessage(this, remote, reply);
+	transport->SendMessage(this, host, port, reply);
     });
 }
 
@@ -1448,8 +1458,10 @@ VRWReplica::HandleRecovery(const TransportAddress &remote,
     }
 
 	RDebug("Sending RECOVERY");
+    string host = transport->get_host(remote);
+    string port = transport->get_port(remote);
     transport->Timer(0, [=]() {
-	transport->SendMessage(this, remote, reply);
+	transport->SendMessage(this, host, port, reply);
     });
     return;
 }

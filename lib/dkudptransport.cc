@@ -89,15 +89,15 @@ bool operator<(const DKUDPTransportAddress &a, const DKUDPTransportAddress &b)
 }
 
 string
-DKUDPTransport::get_host()
+DKUDPTransport::get_host(const DKUDPTransportAddress &addr)
 {
-    return inet_ntoa(addr.sin_addr); 
+    return inet_ntoa(((struct sockaddr_in *)&(addr.addr))->sin_addr); 
 }
 
 string
-DKUDPTransport::get_port()
+DKUDPTransport::get_port(const DKUDPTransportAddress &addr)
 {
-    return std::to_string(htons(addr.sin_port)); 
+    return std::to_string(htons(((struct sockaddr_in *)&(addr.addr))->sin_port)); 
 }
 
 DKUDPTransportAddress

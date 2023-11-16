@@ -72,15 +72,15 @@ UDPTransportAddress::clone() const
 }
 
 string
-DKUDPTransportAddress::get_host()
+UDPTransport::get_host(const UDPTransportAddress &addr)
 {
-    return inet_ntoa(addr.sin_addr); 
+    return inet_ntoa(((struct sockaddr_in *)&(addr.addr))->sin_addr); 
 }
 
 string
-DKUDPTransportAddress::get_port()
+UDPTransport::get_port(const UDPTransportAddress &addr)
 {
-    return htons(addr.sin_port); 
+    return std::to_string(htons(((struct sockaddr_in *)&(addr.addr))->sin_port)); 
 }
 
 bool operator==(const UDPTransportAddress &a, const UDPTransportAddress &b)
