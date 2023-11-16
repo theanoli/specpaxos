@@ -62,7 +62,7 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
                      AppReplica *app)
     : Replica(config, myIdx, initialize, transport, app),
       batchSize(batchSize),
-	  lastCommitteds(config.n, 0),
+      lastCommitteds(config.n, 0),
       log(false),
       prepareOKQuorum(config.QuorumSize()-1),
       startViewChangeQuorum(config.QuorumSize()-1),
@@ -79,7 +79,7 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
     lastBatchEnd = 0;
     batchComplete = true;
 
-	this->cleanUpTo = 0;
+    this->cleanUpTo = 0;
 
     if (batchSize > 1) {
         Notice("Batching enabled; batch size %d", batchSize);
@@ -87,10 +87,10 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
 
     this->viewChangeTimeout = new Timeout(transport, 5000, [this,myIdx]() {
             RWarning("Have not heard from leader; starting view change");
-			view_t step = 1;
-			while (IsWitness(configuration.GetLeaderIndex(view + step))) {
-				step++; 
-			}
+            view_t step = 1;
+            while (IsWitness(configuration.GetLeaderIndex(view + step))) {
+                step++; 
+            }
             StartViewChange(view + step);
         });
     this->nullCommitTimeout = new Timeout(transport, 1000, [this]() {
@@ -104,11 +104,11 @@ VRWReplica::VRWReplica(Configuration config, int myIdx,
     this->resendPrepareTimeout = new Timeout(transport, 500, [this]() {
             ResendPrepare();
         });
-	/*
+    /*
     this->resendValidateTimeout = new Timeout(transport, 500, [this]() {
             ResendValidate();
         });
-		*/
+        */
     this->closeBatchTimeout = new Timeout(transport, 300, [this]() {
             CloseBatch();
         });
@@ -142,7 +142,7 @@ VRWReplica::~VRWReplica()
     delete nullCommitTimeout;
     delete stateTransferTimeout;
     delete resendPrepareTimeout;
-	// delete resendValidateTimeout;
+    // delete resendValidateTimeout;
     delete closeBatchTimeout;
     delete recoveryTimeout;
     
@@ -182,47 +182,49 @@ VRWReplica::CommitUpTo(opnum_t upto)
 
         /* Execute it */
         RDebug("Executing request " FMT_OPNUM " from client %lu (" FMT_OPNUM ")\n\t\t\tLast request from this client: %lu", 
-				lastCommitted, entry->request.clientid(), 
-				entry->request.clientreqid(),
-				clientTable[entry->request.clientid()].lastReqId);
+                lastCommitted, entry->request.clientid(), 
+                entry->request.clientreqid(),
+                clientTable[entry->request.clientid()].lastReqId);
         ReplyMessage reply;
-		Execute(lastCommitted, entry->request, reply);
+        Execute(lastCommitted, entry->request, reply);
 
-		reply.set_view(entry->viewstamp.view);
-		reply.set_opnum(entry->viewstamp.opnum);
-		reply.set_clientreqid(entry->request.clientreqid());
+        reply.set_view(entry->viewstamp.view);
+        reply.set_opnum(entry->viewstamp.opnum);
+        reply.set_clientreqid(entry->request.clientreqid());
 
         /* Mark it as committed */
         log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
 
-		// Store reply in the client table
-		ClientTableEntry &cte =
-			clientTable[entry->request.clientid()];
-		
-		if (cte.lastReqId <= entry->request.clientreqid()) {
-			cte.lastReqId = entry->request.clientreqid();
-			cte.replied = true;
-			cte.reply = reply;            
-		} else {
-			// We've subsequently prepared another operation from the
-			// same client. So this request must have been completed
-			// at the client, and there's no need to record the
-			// result.
-		}
-		if (AmLeader()) {
-			RDebug("Reply size: %ld", reply.ByteSizeLong());
-			RDebug("Sending reply: Client table entry's last reqID for the client %lu: " FMT_OPNUM ", %s", entry->request.clientid(), cte.lastReqId, reply.DebugString().c_str());
-			
-			/* Send reply */
-			auto iter = clientAddresses.find(entry->request.clientid());
-			if (iter != clientAddresses.end()) {
-			    string host = transport->get_host(*iter->second);
-			    string port = transport->get_port(*iter->second);
-			    transport->Timer(0, [=]() {
-				transport->SendMessage(this, host, port, reply);
-			    });
-			}
-		}
+        // Store reply in the client table
+        ClientTableEntry &cte =
+            clientTable[entry->request.clientid()];
+        
+        if (cte.lastReqId <= entry->request.clientreqid()) {
+            cte.lastReqId = entry->request.clientreqid();
+            cte.replied = true;
+            cte.reply = reply;            
+        } else {
+            // We've subsequently prepared another operation from the
+            // same client. So this request must have been completed
+            // at the client, and there's no need to record the
+            // result.
+        }
+        if (AmLeader()) {
+            RDebug("Reply size: %ld", reply.ByteSizeLong());
+            RDebug("Sending reply: Client table entry's last reqID for the client %lu: " 
+                    FMT_OPNUM ", %s", entry->request.clientid(), cte.lastReqId, 
+                    reply.DebugString().c_str());
+            
+            /* Send reply */
+            auto iter = clientAddresses.find(entry->request.clientid());
+            if (iter != clientAddresses.end()) {
+                string host = transport->get_host(*iter->second);
+                string port = transport->get_port(*iter->second);
+                transport->Timer(0, [=]() {
+                transport->SendMessage(this, host, port, reply);
+                });
+            }
+        }
 
         Latency_End(&executeAndReplyLatency);
     }
@@ -249,14 +251,14 @@ VRWReplica::SendPrepareOKs(opnum_t oldLastOp)
         reply.set_view(view);
         reply.set_opnum(i);
         reply.set_replicaidx(myIdx);
-		reply.set_lastcommitted(lastCommitted);
+        reply.set_lastcommitted(lastCommitted);
 
         RDebug("Sending PREPAREOK " FMT_VIEWSTAMP " for new uncommitted operation",
                reply.view(), reply.opnum());
     
-	transport->Timer(0, [=]() {
-	    transport->SendMessageToReplica(this, configuration.GetLeaderIndex(view), reply);
-	});
+        transport->Timer(0, [=]() {
+            transport->SendMessageToReplica(this, configuration.GetLeaderIndex(view), reply);
+        });
     }
 }
 
@@ -325,14 +327,14 @@ VRWReplica::EnterView(view_t newview)
     startViewChangeQuorum.Clear();
     doViewChangeQuorum.Clear();
     recoveryResponseQuorum.Clear();
-	validateReadQuorum.Clear();
+    validateReadQuorum.Clear();
 }
 
 void
 VRWReplica::StartViewChange(view_t newview)
 {
     RNotice("Starting view change for view " FMT_VIEW ", lastCommitted " FMT_OPNUM, newview, lastCommitted);
-	ASSERT(!IsWitness(configuration.GetLeaderIndex(newview)));
+    ASSERT(!IsWitness(configuration.GetLeaderIndex(newview)));
 
     view = newview;
     status = STATUS_VIEW_CHANGE;
@@ -340,7 +342,7 @@ VRWReplica::StartViewChange(view_t newview)
     viewChangeTimeout->Reset();
     nullCommitTimeout->Stop();
     resendPrepareTimeout->Stop();
-	// resendValidateTimeout->Stop();
+    // resendValidateTimeout->Stop();
     closeBatchTimeout->Stop();
 
     StartViewChangeMessage m;
@@ -348,7 +350,7 @@ VRWReplica::StartViewChange(view_t newview)
     m.set_replicaidx(myIdx);
     m.set_lastcommitted(lastCommitted);
 
-	RDebug("Sending StartViewChange");
+    RDebug("Sending StartViewChange");
     transport->Timer(0, [=]() {
         transport->SendMessageToAll(this, m);
     });
@@ -363,7 +365,7 @@ VRWReplica::SendNullCommit()
 
     ASSERT(AmLeader());
 
-	RDebug("Sending NullCommit");
+    RDebug("Sending NullCommit");
     transport->Timer(0, [=]() {
         transport->SendMessageToAll(this, cm);
     });
@@ -373,7 +375,7 @@ void
 VRWReplica::UpdateClientTable(const Request &req)
 {
     ClientTableEntry &entry = clientTable[req.clientid()];
-	RDebug("Updating client %lu: to " FMT_OPNUM " from " FMT_OPNUM, req.clientid(), req.clientreqid(), entry.lastReqId);
+    RDebug("Updating client %lu: to " FMT_OPNUM " from " FMT_OPNUM, req.clientid(), req.clientreqid(), entry.lastReqId);
 
     // ASSERT(entry.lastReqId <= req.clientreqid());
 
@@ -384,7 +386,7 @@ VRWReplica::UpdateClientTable(const Request &req)
     entry.lastReqId = req.clientreqid();
     entry.replied = false;
     entry.reply.Clear();
-	entry.needsReadValidation = false;
+    entry.needsReadValidation = false;
 }
 
 void
@@ -416,9 +418,9 @@ VRWReplica::CloseBatch()
     p.set_view(view);
     p.set_opnum(lastOp);
     p.set_batchstart(batchStart);
-	p.set_cleanupto(GetLowestReplicaCommit()); 
-	//p.set_lastcommitted(lastCommitted); 
-	
+    p.set_cleanupto(GetLowestReplicaCommit()); 
+    //p.set_lastcommitted(lastCommitted); 
+    
     for (opnum_t i = batchStart; i <= lastOp; i++) {
         Request *r = p.add_request();
         const LogEntry *entry = log.Find(i);
@@ -439,14 +441,14 @@ VRWReplica::CloseBatch()
     resendPrepareTimeout->Reset();
     closeBatchTimeout->Stop();
 
-	if (p.cleanupto() > cleanUpTo) {
-		// Clean log up to the lowest committed entry by any replica
-		cleanUpTo = p.cleanupto();
-		CleanLog(); 
-	} else if (p.cleanupto() < cleanUpTo) {
-		RPanic("cleanUpTo decreased! Got " FMT_OPNUM ", had " FMT_OPNUM, 
-				p.cleanupto(), cleanUpTo);
-	}
+    if (p.cleanupto() > cleanUpTo) {
+        // Clean log up to the lowest committed entry by any replica
+        cleanUpTo = p.cleanupto();
+        CleanLog(); 
+    } else if (p.cleanupto() < cleanUpTo) {
+        RPanic("cleanUpTo decreased! Got " FMT_OPNUM ", had " FMT_OPNUM, 
+                p.cleanupto(), cleanUpTo);
+    }
 }
 
 std::thread *
@@ -462,12 +464,13 @@ VRWReplica::ReceiveLoop()
 {
     RNotice("About to enter the receive loop");
     while (true) {
-	while (receiveQueue.size() > 0) {
-	    auto next = std::move(receiveQueue.front());
-	    RNotice("Processing a message: %s", std::get<1>(next).c_str());
-	    ProcessReceivedMessage(*std::get<0>(next), std::get<1>(next), std::get<2>(next));
-	    receiveQueue.pop();
-	}
+        asm("");
+        while (receiveQueue.size() > 0) {
+            auto next = std::move(receiveQueue.front());
+            RNotice("Processing a message: %s", std::get<1>(next).c_str());
+            ProcessReceivedMessage(*std::get<0>(next), std::get<1>(next), std::get<2>(next));
+            receiveQueue.pop();
+        }
     }
 }
 
@@ -476,7 +479,7 @@ VRWReplica::ReceiveMessage(const TransportAddress &remote,
                           const string &type, const string &data)
 {
     receiveQueue.push({std::unique_ptr<TransportAddress>(remote.clone()), 
-		    type, data});
+            type, data});
 }
 
 void
@@ -487,8 +490,8 @@ VRWReplica::ProcessReceivedMessage(const TransportAddress &remote,
     static UnloggedRequestMessage unloggedRequest;
     static PrepareMessage prepare;
     static PrepareOKMessage prepareOK;
-	static ValidateRequestMessage validateRequest;
-	static ValidateReplyMessage validateReply;
+    static ValidateRequestMessage validateRequest;
+    static ValidateReplyMessage validateReply;
     static CommitMessage commit;
     static RequestStateTransferMessage requestStateTransfer;
     static StateTransferMessage stateTransfer;
@@ -501,12 +504,12 @@ VRWReplica::ProcessReceivedMessage(const TransportAddress &remote,
     if (type == request.GetTypeName()) {
         request.ParseFromString(data);
         HandleRequest(remote, request);
-	} else if (type == validateRequest.GetTypeName()) {
-		validateRequest.ParseFromString(data); 
-		HandleValidateRequest(remote, validateRequest);
-	} else if (type == validateReply.GetTypeName()) {
-		validateReply.ParseFromString(data); 
-		HandleValidateReply(remote, validateReply);
+    } else if (type == validateRequest.GetTypeName()) {
+        validateRequest.ParseFromString(data); 
+        HandleValidateRequest(remote, validateRequest);
+    } else if (type == validateReply.GetTypeName()) {
+        validateReply.ParseFromString(data); 
+        HandleValidateReply(remote, validateReply);
     } else if (type == unloggedRequest.GetTypeName()) {
         unloggedRequest.ParseFromString(data);
         HandleUnloggedRequest(remote, unloggedRequest);
@@ -588,26 +591,26 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
             // discard the request.
             if (entry.replied) {
                 RNotice("Received duplicate request; resending reply");
-		string host = transport->get_host(remote);
-		string port = transport->get_port(remote);
-		transport->Timer(0, [=]() {
-		    transport->SendMessage(this, host, port, entry.reply);
-		});
+        string host = transport->get_host(remote);
+        string port = transport->get_port(remote);
+        transport->Timer(0, [=]() {
+            transport->SendMessage(this, host, port, entry.reply);
+        });
                 Latency_EndType(&requestLatency, 'r');
                 return;
             } else {
-				if (!entry.needsReadValidation) {
-					RNotice("Received duplicate request %lu:" FMT_OPNUM " but no reply available; ignoring", 
-							msg.req().clientid(), msg.req().clientreqid());
-					Latency_EndType(&requestLatency, 'd');
-					return;
-				}
+                if (!entry.needsReadValidation) {
+                    RNotice("Received duplicate request %lu:" FMT_OPNUM " but no reply available; ignoring", 
+                            msg.req().clientid(), msg.req().clientreqid());
+                    Latency_EndType(&requestLatency, 'd');
+                    return;
+                }
             }
         }
-		RDebug("Last reqID for client %lu: " FMT_OPNUM, msg.req().clientid(), entry.lastReqId);
+        RDebug("Last reqID for client %lu: " FMT_OPNUM, msg.req().clientid(), entry.lastReqId);
     } else {
-		RNotice("New client %lu!", msg.req().clientid());
-	}
+        RNotice("New client %lu!", msg.req().clientid());
+    }
 
     // Update the client table
     UpdateClientTable(msg.req());
@@ -615,44 +618,44 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
     // Leader Upcall
     bool replicate = false;
     string res;
-	// TS: LeaderUpcall is basically a no-op for all example ops: it checks if the op should 
-	// be replicated and copies the op into res. 
+    // TS: LeaderUpcall is basically a no-op for all example ops: it checks if the op should 
+    // be replicated and copies the op into res. 
     LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
     ClientTableEntry &cte =
         clientTable[msg.req().clientid()];
 
-	// Check whether this is a stealth read. This is NOT the same as an unlogged operation.
-	// The current leader must prove leadership at the time the read was done: this proves
-	// the replica had the most up-to-date version of the database at read time. 
-	Request request;
-	request.set_op(res);
-	request.set_clientid(msg.req().clientid());
-	request.set_clientreqid(msg.req().clientreqid());
+    // Check whether this is a stealth read. This is NOT the same as an unlogged operation.
+    // The current leader must prove leadership at the time the read was done: this proves
+    // the replica had the most up-to-date version of the database at read time. 
+    Request request;
+    request.set_op(res);
+    request.set_clientid(msg.req().clientid());
+    request.set_clientreqid(msg.req().clientreqid());
 
     if (!replicate) {
-		ReplyMessage reply; 
-		Execute(lastCommitted, request, reply);
-		reply.set_view(view);
-		reply.set_opnum(0);
-		reply.set_clientreqid(msg.req().clientreqid());
+        ReplyMessage reply; 
+        Execute(lastCommitted, request, reply);
+        reply.set_view(view);
+        reply.set_opnum(0);
+        reply.set_clientreqid(msg.req().clientreqid());
 
         cte.replied = false;
         cte.reply = reply;
-		cte.needsReadValidation = true;
-		
-		// Send the ValidateRequestMessage here. 
-		RDebug("Sending request to confirm leader-ship to other replicas");
-		/* Send validate messages */
-		ValidateRequestMessage p;
-		p.set_view(this->view);  // How to tell leader was leader when read was done
-		p.set_clientid(msg.req().clientid());  // Use client_id and client_req_id as labels? 
-		p.set_clientreqid(msg.req().clientreqid());
+        cte.needsReadValidation = true;
+        
+        // Send the ValidateRequestMessage here. 
+        RDebug("Sending request to confirm leader-ship to other replicas");
+        /* Send validate messages */
+        ValidateRequestMessage p;
+        p.set_view(this->view);  // How to tell leader was leader when read was done
+        p.set_clientid(msg.req().clientid());  // Use client_id and client_req_id as labels? 
+        p.set_clientreqid(msg.req().clientreqid());
 
-		lastValidate = p; 
-		
-	        transport->Timer(0, [=]() {
-	            transport->SendMessageToAll(this, p);
-	        });
+        lastValidate = p; 
+        
+            transport->Timer(0, [=]() {
+                transport->SendMessageToAll(this, p);
+            });
     } else {
         /* Assign it an opnum */
         ++this->lastOp;
@@ -660,7 +663,7 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
         v.opnum = this->lastOp;
 
         RDebug("Received REQUEST %zu:" FMT_OPNUM", assigning " FMT_VIEWSTAMP, 
-				msg.req().clientid(), msg.req().clientreqid(), VA_VIEWSTAMP(v));
+                msg.req().clientid(), msg.req().clientreqid(), VA_VIEWSTAMP(v));
 
         /* Add the request to my log */
         log.Append(v, request, LOG_STATE_PREPARED);
@@ -674,125 +677,125 @@ VRWReplica::HandleRequest(const TransportAddress &remote,
                 closeBatchTimeout->Start();
             }
         }
-		nullCommitTimeout->Reset();
+        nullCommitTimeout->Reset();
     }
-	Latency_End(&requestLatency);
+    Latency_End(&requestLatency);
 }
 
 void
 VRWReplica::HandleValidateRequest(const TransportAddress &remote,
-									const ValidateRequestMessage &msg)
+                                    const ValidateRequestMessage &msg)
 {
     if (status != STATUS_NORMAL) {
-		// Cannot do this in the middle of a view change
+        // Cannot do this in the middle of a view change
         RNotice("Ignoring validate request due to abnormal status");
         return;
     }
 
-	bool isvalid = false; 
-	if (this->view > msg.view()) {
-		RNotice("We went through a view change after validation was sent! Refusing to validate"); 
-	} else if (this->view < msg.view()) {
-		// OK to drop here; others will validate instead, since a quorum accepted
-		// the viewchange already
-		RNotice("We are lagging in viewchanges; dropping validation request");
-		return;
-	} else {
-		isvalid = true;
-	}
-	
+    bool isvalid = false; 
+    if (this->view > msg.view()) {
+        RNotice("We went through a view change after validation was sent! Refusing to validate"); 
+    } else if (this->view < msg.view()) {
+        // OK to drop here; others will validate instead, since a quorum accepted
+        // the viewchange already
+        RNotice("We are lagging in viewchanges; dropping validation request");
+        return;
+    } else {
+        isvalid = true;
+    }
+    
     ValidateReplyMessage reply;
-	reply.set_replicaidx(myIdx); 
-	reply.set_isvalid(isvalid);
+    reply.set_replicaidx(myIdx); 
+    reply.set_isvalid(isvalid);
     reply.set_clientid(msg.clientid());
     reply.set_clientreqid(msg.clientreqid());
 
-	RDebug("Sending validate response to leader");
+    RDebug("Sending validate response to leader");
     string host = transport->get_host(remote);
     string port = transport->get_port(remote);
     transport->Timer(0, [=]() {
-	transport->SendMessage(this, host, port, reply);
+    transport->SendMessage(this, host, port, reply);
     });
 }
 
 void
 VRWReplica::HandleValidateReply(const TransportAddress &remote,
-									const ValidateReplyMessage &msg)
+                                    const ValidateReplyMessage &msg)
 {
-	// I think we can still validate if the status is not normal.
-	// The read was stored while the replica was the leader; if it was valid 
-	// then, it is valid now. 
+    // I think we can still validate if the status is not normal.
+    // The read was stored while the replica was the leader; if it was valid 
+    // then, it is valid now. 
     auto msgs = validateReadQuorum.AddAndCheckForQuorumOrNack(
-			std::pair<uint64_t, uint64_t>(msg.clientid(), msg.clientreqid()),
+            std::pair<uint64_t, uint64_t>(msg.clientid(), msg.clientreqid()),
                                                             msg.replicaidx(),
                                                             msg);
-	// When we can validate: 
-	// - A quorum of nodes responds with ACKs
-	// When we cannot validate: 
-	// - ANYONE responds with a NACK. Responding with a NACK means they are in the normal state
-	// 		and their view number has advanced, i.e., they went through a round of leader
-	// 		election and it was successful. 
-	//
+    // When we can validate: 
+    // - A quorum of nodes responds with ACKs
+    // When we cannot validate: 
+    // - ANYONE responds with a NACK. Responding with a NACK means they are in the normal state
+    //      and their view number has advanced, i.e., they went through a round of leader
+    //      election and it was successful. 
+    //
     if (msgs != NULL) {
-		// Extra validation response we do not need to bother with. If we have reached a 
-		// quorum already, any nodes that respond will not respond with a NACK even if
-		// they advance to a new view (unless a bunch of time has passed and the whole system
-		// has moved on to a new view since the validation-seeker got responses from the
-		// quorum, but anyway those validations are still... valid)
+        // Extra validation response we do not need to bother with. If we have reached a 
+        // quorum already, any nodes that respond will not respond with a NACK even if
+        // they advance to a new view (unless a bunch of time has passed and the whole system
+        // has moved on to a new view since the validation-seeker got responses from the
+        // quorum, but anyway those validations are still... valid)
         if (msgs->size() >= (unsigned)configuration.QuorumSize()) {
             return;
         }
 
         for (const auto &kv : *msgs) {
-			if (!kv.second.isvalid()) {
-				RDebug("Another replica NACKed the validate request! Not servicing read");
-				return;
-			}
+            if (!kv.second.isvalid()) {
+                RDebug("Another replica NACKed the validate request! Not servicing read");
+                return;
+            }
         }
-		
-		// TODO respond to the client and do whatever bookkeeping is needed
-		ClientTableEntry &cte = clientTable[msg.clientid()];
-		ASSERT(cte.reply.clientreqid() == msg.clientreqid());
-		cte.replied = true;
+        
+        // TODO respond to the client and do whatever bookkeeping is needed
+        ClientTableEntry &cte = clientTable[msg.clientid()];
+        ASSERT(cte.reply.clientreqid() == msg.clientreqid());
+        cte.replied = true;
 
-		/* THIS IS THE WRONG THING TO DO
+        /* THIS IS THE WRONG THING TO DO
         ReplyMessage reply;
-		const LogEntry *entry = log.Find(lastCommitted);
-		Execute(lastCommitted, entry->request, reply);
+        const LogEntry *entry = log.Find(lastCommitted);
+        Execute(lastCommitted, entry->request, reply);
 
-		reply.set_view(cte.reply.view());
-		reply.set_opnum(msg.clientreqid());
-		reply.set_clientreqid(msg.clientreqid());
-		*/
+        reply.set_view(cte.reply.view());
+        reply.set_opnum(msg.clientreqid());
+        reply.set_clientreqid(msg.clientreqid());
+        */
 
-		RDebug("Reply size: %ld", cte.reply.ByteSizeLong());
-		RDebug("Sending response for validated read for client %lu, reqid %lu, view %lu: %s",
-				msg.clientid(), cte.reply.clientreqid(), cte.reply.view(), cte.reply.DebugString().c_str());
+        RDebug("Reply size: %ld", cte.reply.ByteSizeLong());
+        RDebug("Sending response for validated read for client %lu, reqid %lu, view %lu: %s",
+                msg.clientid(), cte.reply.clientreqid(), cte.reply.view(), cte.reply.DebugString().c_str());
 
-		/* Send reply */
-		auto iter = clientAddresses.find(msg.clientid());
-		if (iter != clientAddresses.end()) {
-		    string host = transport->get_host(*iter->second);
-		    string port = transport->get_port(*iter->second);
-		    transport->Timer(0, [=]() {
-			transport->SendMessage(this, host, port, cte.reply);
-		    });
-		}
+        /* Send reply */
+        auto iter = clientAddresses.find(msg.clientid());
+        if (iter != clientAddresses.end()) {
+            string host = transport->get_host(*iter->second);
+            string port = transport->get_port(*iter->second);
+            transport->Timer(0, [=]() {
+            transport->SendMessage(this, host, port, cte.reply);
+            });
+        }
     }
 }
 
 void
 VRWReplica::ResendValidate()
 {
-	if ((!AmLeader()) || (lastValidate.view() != this->view)) {
-		// Drop if we are not leader anymore; someone else should handle
-		// this request. 
-		// If the view has changed a few times and we're still the leader, the
-		// old read is still valid. But it is easiest to have the client re-send
-		// the read and for this leader to re-do it with an up-to-date value. 
-		// We could handle responses for the same view for multiple outstanding 
-		// validations, but this is complicated and doing it the naive way 
-		// incurs at most as many messages as normal-case processing. 
+    if ((!AmLeader()) || (lastValidate.view() != this->view)) {
+        // Drop if we are not leader anymore; someone else should handle
+        // this request. 
+        // If the view has changed a few times and we're still the leader, the
+        // old read is still valid. But it is easiest to have the client re-send
+        // the read and for this leader to re-do it with an up-to-date value. 
+        // We could handle responses for the same view for multiple outstanding 
+        // validations, but this is complicated and doing it the naive way 
+        // incurs at most as many messages as normal-case processing. 
         return;
     }
     RNotice("Resending last validate message");
@@ -821,7 +824,7 @@ VRWReplica::HandleUnloggedRequest(const TransportAddress &remote,
     string host = transport->get_host(remote);
     string port = transport->get_port(remote);
     transport->Timer(0, [=]() {
-	transport->SendMessage(this, host, port, reply);
+    transport->SendMessage(this, host, port, reply);
     });
 }
 
@@ -833,9 +836,9 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
            msg.view(), msg.batchstart(), msg.opnum());
 
     if (msg.view() == this->view && this->status == STATUS_VIEW_CHANGE) {
-		if (AmLeader()) {
-			RPanic("Unexpected PREPARE: I'm the leader of this view");
-		}
+        if (AmLeader()) {
+            RPanic("Unexpected PREPARE: I'm the leader of this view");
+        }
         RequestStateTransfer();
         pendingPrepares.push_back(std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
         return;
@@ -861,21 +864,21 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
         RPanic("Unexpected PREPARE: I'm the leader of this view");
     }
 
-	if (msg.cleanupto() > lastCommitted) {
-		RPanic("Asking me to clean an entry after my lastCommitted!");
-	}
+    if (msg.cleanupto() > lastCommitted) {
+        RPanic("Asking me to clean an entry after my lastCommitted!");
+    }
 
-	if (msg.cleanupto() > cleanUpTo) {
-		// Clean log up to the lowest committed entry by any replica
-		cleanUpTo = msg.cleanupto();
-		CleanLog(); 
-	} else if (msg.cleanupto() < cleanUpTo) {
-		// A node can see a lower cleanUpTo if the leader fell behind: when it reconstructs
-		// state, it will use its own cleanUpTo as a "safe" value, and will update it 
-		// later once it hears from all the other replicas. 
-		RWarning("cleanUpTo decreased! Got " FMT_OPNUM ", had " FMT_OPNUM, 
-				msg.cleanupto(), cleanUpTo);
-	}
+    if (msg.cleanupto() > cleanUpTo) {
+        // Clean log up to the lowest committed entry by any replica
+        cleanUpTo = msg.cleanupto();
+        CleanLog(); 
+    } else if (msg.cleanupto() < cleanUpTo) {
+        // A node can see a lower cleanUpTo if the leader fell behind: when it reconstructs
+        // state, it will use its own cleanUpTo as a "safe" value, and will update it 
+        // later once it hears from all the other replicas. 
+        RWarning("cleanUpTo decreased! Got " FMT_OPNUM ", had " FMT_OPNUM, 
+                msg.cleanupto(), cleanUpTo);
+    }
 
     ASSERT(msg.batchstart() <= msg.opnum());
     ASSERT_EQ(msg.opnum()-msg.batchstart()+1, (unsigned)msg.request_size());
@@ -889,7 +892,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
         reply.set_view(msg.view());
         reply.set_opnum(msg.opnum());
         reply.set_replicaidx(myIdx);
-		reply.set_lastcommitted(lastCommitted);
+        reply.set_lastcommitted(lastCommitted);
         transport->Timer(0, [=]() {
             transport->SendMessageToReplica(this, configuration.GetLeaderIndex(view), reply);
         });
@@ -897,7 +900,7 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
     }
 
     if (msg.batchstart() > this->lastOp+1) {
-		RNotice("Requesting state transfer in HandlePrepare");
+        RNotice("Requesting state transfer in HandlePrepare");
         RequestStateTransfer();
         pendingPrepares.push_back(std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
         return;
@@ -922,9 +925,9 @@ VRWReplica::HandlePrepare(const TransportAddress &remote,
     reply.set_view(msg.view());
     reply.set_opnum(msg.opnum());
     reply.set_replicaidx(myIdx);
-	reply.set_lastcommitted(lastCommitted);
+    reply.set_lastcommitted(lastCommitted);
     
-	RDebug("Sending PREPAREOK");
+    RDebug("Sending PREPAREOK");
     transport->Timer(0, [=]() {
         transport->SendMessageToReplica(this, configuration.GetLeaderIndex(view), reply);
     });
@@ -960,18 +963,18 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
         return;        
     }
 
-	/* 
-	 * The leader needs to figure out the lowest commit number among replicas. 
-	 * It should maintain a vector of the current lastCommitteds of the replicas, 
-	 * and then update as replicas make progress.
-	 */
-	try {
-		[[maybe_unused]] opnum_t replicaLastRecordedCommit = lastCommitteds.at(msg.replicaidx());
-		ASSERT(replicaLastRecordedCommit <= msg.lastcommitted());
-		lastCommitteds.at(msg.replicaidx()) = msg.lastcommitted();
-	} catch (std::out_of_range const& exc) {
-		RPanic("Tried to access an element that was out of range in lastCommitteds!");
-	}
+    /* 
+     * The leader needs to figure out the lowest commit number among replicas. 
+     * It should maintain a vector of the current lastCommitteds of the replicas, 
+     * and then update as replicas make progress.
+     */
+    try {
+        [[maybe_unused]] opnum_t replicaLastRecordedCommit = lastCommitteds.at(msg.replicaidx());
+        ASSERT(replicaLastRecordedCommit <= msg.lastcommitted());
+        lastCommitteds.at(msg.replicaidx()) = msg.lastcommitted();
+    } catch (std::out_of_range const& exc) {
+        RPanic("Tried to access an element that was out of range in lastCommitteds!");
+    }
     
     viewstamp_t vs = { msg.view(), msg.opnum() };
     if (auto msgs =
@@ -986,7 +989,7 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
          * This also notifies the client of the result.
          */
         CommitUpTo(msg.opnum());
-		lastCommitteds.at(myIdx) = lastCommitted;
+        lastCommitteds.at(myIdx) = lastCommitted;
 
         if (msgs->size() >= (unsigned)configuration.QuorumSize()) {
             return;
@@ -1002,10 +1005,10 @@ VRWReplica::HandlePrepareOK(const TransportAddress &remote,
         cm.set_view(this->view);
         cm.set_opnum(this->lastCommitted);
 
-		RDebug("Sending COMMIT");
-	transport->Timer(0, [=]() {
-	    transport->SendMessageToAll(this, cm);
-	});
+        RDebug("Sending COMMIT");
+    transport->Timer(0, [=]() {
+        transport->SendMessageToAll(this, cm);
+    });
 
         nullCommitTimeout->Reset();
 
@@ -1052,7 +1055,7 @@ VRWReplica::HandleCommit(const TransportAddress &remote,
     }
 
     if (msg.opnum() > this->lastOp) {
-		RNotice("Requesting state transfer in HandleCommit");
+        RNotice("Requesting state transfer in HandleCommit");
         RequestStateTransfer();
         return;
     }
@@ -1091,7 +1094,7 @@ VRWReplica::HandleRequestStateTransfer(const TransportAddress &remote,
     string host = transport->get_host(remote);
     string port = transport->get_port(remote);
     transport->Timer(0, [=]() {
-	transport->SendMessage(this, host, port, reply);
+    transport->SendMessage(this, host, port, reply);
     });
 }
 
@@ -1151,7 +1154,7 @@ VRWReplica::HandleStateTransfer(const TransportAddress &remote,
             viewstamp_t vs = { newEntry.view(), newEntry.opnum() };
             log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
         }
-		UpdateClientTable(newEntry.request());
+        UpdateClientTable(newEntry.request());
     }
     
 
@@ -1221,16 +1224,16 @@ VRWReplica::HandleStartViewChange(const TransportAddress &remote,
                     return a.second.lastcommitted() < b.second.lastcommitted();
                 })->second.lastcommitted();
             minCommitted = std::min(minCommitted, lastCommitted);
-			minCommitted = std::min(minCommitted, GetLowestReplicaCommit());
+            minCommitted = std::min(minCommitted, GetLowestReplicaCommit());
             
             log.Dump(minCommitted,
                      dvc.mutable_entries());
-			RNotice("Sending DoViewChange: %d minCommitted: " FMT_OPNUM ", lastCommitted: " FMT_OPNUM, 
-					msg.replicaidx(), minCommitted, lastCommitted);
+            RNotice("Sending DoViewChange: %d minCommitted: " FMT_OPNUM ", lastCommitted: " FMT_OPNUM, 
+                    msg.replicaidx(), minCommitted, lastCommitted);
 
-	    transport->Timer(0, [=]() {
-		transport->SendMessageToReplica(this, leader, dvc);
-	    });
+        transport->Timer(0, [=]() {
+        transport->SendMessageToReplica(this, leader, dvc);
+        });
         }
     }
 }
@@ -1274,19 +1277,19 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         // one with the latest viewstamp
         view_t latestView = log.LastViewstamp().view;
         opnum_t latestOp = log.LastViewstamp().opnum;
-		opnum_t highestCommitted = lastCommitted; 
+        opnum_t highestCommitted = lastCommitted; 
         DoViewChangeMessage latestMsgObj;
         DoViewChangeMessage *latestMsg = NULL;
 
         for (auto kv : *msgs) {
             DoViewChangeMessage &x = kv.second;
-			highestCommitted = std::max(x.lastcommitted(), highestCommitted); 
+            highestCommitted = std::max(x.lastcommitted(), highestCommitted); 
             if ((x.lastnormalview() > latestView) ||
                 (((x.lastnormalview() == latestView) &&
                   (x.lastop() > latestOp)))) {
                 latestView = x.lastnormalview();
                 latestOp = x.lastop();
-				latestMsgObj = kv.second;
+                latestMsgObj = kv.second;
                 latestMsg = &latestMsgObj;
             }
         }
@@ -1302,7 +1305,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                 // log. That should only happen in the corner case
                 // that everyone already had the entire log, maybe
                 // because it actually is empty.
-				RDebug("Log is empty; continuing with view change"); 
+                RDebug("Log is empty; continuing with view change"); 
                 ASSERT(lastCommitted == msg.lastcommitted());
                 ASSERT(msg.lastop() == msg.lastcommitted());
             } else {
@@ -1313,9 +1316,9 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
                 log.RemoveAfter(latestMsg->lastop()+1);
                 log.Install(latestMsg->entries().begin(),
                             latestMsg->entries().end());
-				for (auto entry : latestMsg->entries()) {
-					UpdateClientTable(entry.request()); 
-				}
+                for (auto entry : latestMsg->entries()) {
+                    UpdateClientTable(entry.request()); 
+                }
             }
         } else {
             RDebug("My log is most current, lastnormalview=" FMT_VIEW " lastop=" FMT_OPNUM,
@@ -1329,7 +1332,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         // We need to compute this before we enter the new view
         // because the saved messages will go away.
         auto svcs = startViewChangeQuorum.GetMessages(view);
-			
+            
         opnum_t minCommittedSVC = std::min_element(
             svcs.begin(), svcs.end(),
             [](decltype(*svcs.begin()) a,
@@ -1352,19 +1355,19 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
 
         ASSERT(AmLeader());
         
-		CommitUpTo(highestCommitted);
+        CommitUpTo(highestCommitted);
 
-		// When a new leader comes up, it will start sending around cleanUpTo messages.
-		// It is SAFE to send around a cleanUpTo of 0, since it will be a no-op on replicas.
-		// It is also safe to send around the new leader's cleanUpTo, since cleaning 
-		// up to that value was safe before it became the leader. We can also use this 
-		// value as the lastCommitted for each node in the lastCommitteds list; the true
-		// lastCommitted of each node is not less than this value, because otherwise we 
-		// could not have chosen this value as the cleanUpTo. If the lastCommitted of a node
-		// is equal, no-op. If it is greater, then we will update it on the next PrepareOK round.
-		for (size_t i = 0; i < lastCommitteds.size(); i++) {
-			lastCommitteds[i] = cleanUpTo;
-		}
+        // When a new leader comes up, it will start sending around cleanUpTo messages.
+        // It is SAFE to send around a cleanUpTo of 0, since it will be a no-op on replicas.
+        // It is also safe to send around the new leader's cleanUpTo, since cleaning 
+        // up to that value was safe before it became the leader. We can also use this 
+        // value as the lastCommitted for each node in the lastCommitteds list; the true
+        // lastCommitted of each node is not less than this value, because otherwise we 
+        // could not have chosen this value as the cleanUpTo. If the lastCommitted of a node
+        // is equal, no-op. If it is greater, then we will update it on the next PrepareOK round.
+        for (size_t i = 0; i < lastCommitteds.size(); i++) {
+            lastCommitteds[i] = cleanUpTo;
+        }
 
         // Send a STARTVIEW message with the new log
         StartViewMessage sv;
@@ -1374,7 +1377,7 @@ VRWReplica::HandleDoViewChange(const TransportAddress &remote,
         
         log.Dump(minCommitted, sv.mutable_entries());
 
-		RDebug("Sending StartView");
+        RDebug("Sending StartView");
         transport->Timer(0, [=]() {
             transport->SendMessageToAll(this, sv);
         });
@@ -1412,16 +1415,16 @@ VRWReplica::HandleStartView(const TransportAddress &remote,
         }
         
         // Install the new log
-		// TS We want to get rid of anything after the last operation seen by the replica
-		// giving us the log. Then we will reconcile what's left with the log given to us
-		// by that replica, possibly adding new entries and/or replacing existing entries. 
+        // TS We want to get rid of anything after the last operation seen by the replica
+        // giving us the log. Then we will reconcile what's left with the log given to us
+        // by that replica, possibly adding new entries and/or replacing existing entries. 
         log.RemoveAfter(msg.lastop()+1);
         log.Install(msg.entries().begin(),
                     msg.entries().end());        
-		
-		for (auto entry : msg.entries()) {
-			UpdateClientTable(entry.request());
-		}
+        
+        for (auto entry : msg.entries()) {
+            UpdateClientTable(entry.request());
+        }
     }
 
 
@@ -1456,11 +1459,11 @@ VRWReplica::HandleRecovery(const TransportAddress &remote,
         log.Dump(0, reply.mutable_entries());
     }
 
-	RDebug("Sending RECOVERY");
+    RDebug("Sending RECOVERY");
     string host = transport->get_host(remote);
     string port = transport->get_port(remote);
     transport->Timer(0, [=]() {
-	transport->SendMessage(this, host, port, reply);
+    transport->SendMessage(this, host, port, reply);
     });
     return;
 }
@@ -1516,24 +1519,24 @@ VRWReplica::HandleRecoveryResponse(const TransportAddress &remote,
 opnum_t
 VRWReplica::GetLowestReplicaCommit()
 {
-	opnum_t lowest = *std::min_element(lastCommitteds.begin(), lastCommitteds.end()); 
-	return lowest;
+    opnum_t lowest = *std::min_element(lastCommitteds.begin(), lastCommitteds.end()); 
+    return lowest;
 }
 
 void
 VRWReplica::CleanLog()
 {
-	/* 
-	 * Truncate the log up to the current cleanUpTo value.
-	 */
-	RDebug("Cleaning up to " FMT_OPNUM, cleanUpTo);
-	log.RemoveUpTo(cleanUpTo);
+    /* 
+     * Truncate the log up to the current cleanUpTo value.
+     */
+    RDebug("Cleaning up to " FMT_OPNUM, cleanUpTo);
+    log.RemoveUpTo(cleanUpTo);
 }
 
 size_t
 VRWReplica::GetLogSize()
 {
-	return log.Size();
+    return log.Size();
 }
 
 } // namespace specpaxos::vrw
