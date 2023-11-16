@@ -464,13 +464,16 @@ VRWReplica::ReceiveLoop()
 {
     RNotice("About to enter the receive loop");
     while (true) {
-        while (receiveQueue.size() > 0) {
-	    asm("");
-            auto next = std::move(receiveQueue.front());
-            RNotice("Processing a message: %s", std::get<1>(next).c_str());
-            ProcessReceivedMessage(*std::get<0>(next), std::get<1>(next), std::get<2>(next));
-            receiveQueue.pop();
-        }
+	std::unique_lock<std::mutex> lk(m);
+	cv.wait(lk, [this]{ return this->receiveQueue.size() > 0; }); 
+
+        auto next = std::move(receiveQueue.front());
+        receiveQueue.pop();
+	lk.unlock();
+	cv.notify_one();  // vs. notify_all? Shouldn't matter which one
+
+        RNotice("Processing a message: %s", std::get<1>(next).c_str());
+        ProcessReceivedMessage(*std::get<0>(next), std::get<1>(next), std::get<2>(next));
     }
 }
 
@@ -478,8 +481,10 @@ void
 VRWReplica::ReceiveMessage(const TransportAddress &remote,
                           const string &type, const string &data)
 {
+    std::unique_lock<std::mutex> lk(m);
     receiveQueue.push({std::unique_ptr<TransportAddress>(remote.clone()), 
             type, data});
+    cv.notify_one();
 }
 
 void

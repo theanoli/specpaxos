@@ -38,10 +38,12 @@
 #include "common/quorumset.h"
 #include "vrw/vrw-proto.pb.h"
 
+#include <condition_variable>
 #include <limits>
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <thread>
 
@@ -90,7 +92,10 @@ public:
     std::thread *LaunchReceiveThread();
     void ReceiveMessage(const TransportAddress &remote,
                         const string &type, const string &data);
-	size_t GetLogSize();  // For testing
+    size_t GetLogSize();  // For testing
+
+    std::condition_variable cv;
+    std::mutex m;
 
 private:
     std::queue<std::tuple<std::unique_ptr<TransportAddress>, const string, const string>> receiveQueue; 
