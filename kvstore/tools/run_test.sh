@@ -28,7 +28,7 @@ failure() {
 trap 'failure ${LINENO} "$BASH_COMMAND"' ERR
 
 # Paths to source code and logfiles.
-srcdir="$HOME/apiary/beehive-electrode/specpaxos-mod"
+srcdir="$HOME/specpaxos"
 #configdir="$srcdir/kvstore/configs/100gb_cluster"
 configdir=`realpath "$1"`
 logdir="${srcdir}/logs"
@@ -54,13 +54,13 @@ validate_reads=$2
 nclients=$3  # number of client machines to use
 nclient_threads=$4    # number of clients to run (per machine)
 nclient_procs=$((nclients * nclient_threads))
-nshard=4    # number of shards
+nshard=1    # number of shards
 nkeys=1000 # number of keys to use
 rtime=30     # duration to run
 
 wper=10       # writes percentage
 err=0        # error
-zalpha=-1    # zipf alpha (-1 to disable zipf and enable uniform)
+zalpha=0.9    # zipf alpha (-1 to disable zipf and enable uniform)
 
 # Print out configuration being used.
 echo "Configuration:"
@@ -139,7 +139,7 @@ echo "Waiting for client(s) to exit"
 client_count=1
 for host in ${clients[@]}
 do
-  ssh $host "$srcdir/kvstore/tools/wait_client.sh $client"
+  ssh $host "$srcdir/kvstore/tools/wait_client.sh $client $USER"
   client_count=$((client_count+1))
   if [ $client_count -gt $nclients ]; then
 	  break

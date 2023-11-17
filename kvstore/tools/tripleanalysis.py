@@ -1,4 +1,4 @@
-from analysis import main as process
+from analysis_kvstore import main as process
 
 import os, sys, mmap
 sys.path.append(os.getcwd() + '/../../scripts')
@@ -12,7 +12,7 @@ from pathlib import Path
 import re
 from collections import defaultdict
 
-from analysis import analyze
+from analysis_kvstore import analyze
 def main():
     config1 = sys.argv[1]
     version1 = sys.argv[2]
@@ -25,8 +25,8 @@ def main():
     df2, m2 = analyze(config2, version2)
     df3, m3 = analyze(config3, version3)
 
-    df1["source"] = "CPU RV=false"
-    df2["source"] = "CPU RV=true"
+    df1["source"] = "CPU irrelevant"
+    df2["source"] = "CPU"
     df3["source"] = "FPGA"
 
     df = pd.concat([df1, df2, df3]).reset_index(drop=True)

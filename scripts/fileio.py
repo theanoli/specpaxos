@@ -32,14 +32,17 @@ class FileIO:
         ret = string_to_dict(str(filename), self.runstring)
         del ret['suffix']
         return ret
-    def get_raw_data(self, supplied, process_file):
+    def get_raw_data(self, supplied, process_file, suffix=".us", check_errfile=True):
         keys_needed = [key for key in self.what_defines_a_run if key not in supplied]
         #print(f"Finding: {keys_needed}")
         request = supplied.copy()
         for key in keys_needed:
             request[key] = "*"
-        toglob = self.make_filename(**request, suffix=".us")
-        paths = Path('.').glob(toglob)
+        toglob = self.make_filename(**request, suffix=suffix)
+        if toglob[0] == '/':
+            paths = Path('/').glob(toglob[1:])
+        else:
+            paths = Path('.').glob(toglob)
         print(toglob)
         # now we need to parse all the results
         #results = map(paths, unmake_filename)
@@ -55,13 +58,14 @@ class FileIO:
             # check for errors
             # mmap it because it may be huge
             errors = "no"
-            if 'thread_num' not in run.keys() or int(run['thread_num']) == 0:
+            if check_errfile and ('thread_num' not in run.keys() or int(run['thread_num']) == 0):
                 errfile = self.make_filename(**run, suffix=".stderr")
                 if os.path.getsize(errfile) > 1000000:
                     errors = 'maybe'
                 with open(errfile, 'r') as f:
                     errtext = mmap.mmap(f.fileno(), 0, prot=mmap.PROT_READ)
-                    state_err = re.search(b'PANIC|state transfer|received a duplicate message', errtext)
+                    #state_err = re.search(b'PANIC|state transfer|received a duplicate message', errtext)
+                    state_err = re.search(b'PANIC|state transfer|duplicate', errtext)
                     if (state_err):
                         errors = 'yes'
             if "error" not in ret_dict:
@@ -74,6 +78,7 @@ class FileIO:
             df.loc[len(df)] = {**run, **ret_dict}
         df = df.apply(pd.to_numeric, errors='ignore')
         return (df, self.what_defines_a_run)
+        #return (df, headers)
 
 def collapse(df, meta, by, funcs, consider_errors=True):
     what_defines_an_old_run = meta
@@ -89,5 +94,13 @@ def collapse(df, meta, by, funcs, consider_errors=True):
             df_err = df
         else:
             df_err = df.loc(df["error"] != "yes")
-        df = df_err.groupby(what_defines_a_run).agg(**funcs).reset_index()
+        #print(df_err.head())
+        #print(what_defines_a_run)
+        #print(funcs)
+        #df = df_err.groupby(what_defines_a_run).agg(**funcs).reset_index()
+        asdf = df_err.groupby(what_defines_a_run)
+        df = asdf.agg(**funcs)
+        print(df.head())
+        #print(1 / 0)
+        df = df.reset_index()
     return (df, what_defines_a_run)
