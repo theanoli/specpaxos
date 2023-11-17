@@ -207,11 +207,13 @@ main(int argc, char **argv)
 	    std::thread *t;
             if (specpaxos::IsWitness(index)) {
 		fprintf(stdout, "Creating a witness thread\n");
+		fflush(stdout);
                 specpaxos::vrw::VRWWitness *witness = new specpaxos::vrw::VRWWitness(
 				config, index, true, &transport, 1, server);
 		t = witness->LaunchReceiveThread();
             } else {
 		fprintf(stdout, "Creating a replica thread\n");
+		fflush(stdout);
                 specpaxos::vrw::VRWReplica *replica = new specpaxos::vrw::VRWReplica(
 				config, index, true, &transport, 1, server);
 		t = replica->LaunchReceiveThread();
@@ -229,7 +231,6 @@ main(int argc, char **argv)
         }
 	fflush(stdout);
     }
-    
 
     fprintf(stdout, "Running the transport layer\n");
     fflush(stdout);

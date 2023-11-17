@@ -218,12 +218,21 @@ DKUDPTransport::DKUDPTransport(double dropRate, double reorderRate,
     if (reorderRate > 0) {
         Panic("Reorder rate unimplemented");
     }
+}
     
+void
+DKUDPTransport::SetupLibevent()
+{
     // Set up libevent
+    Notice("Grabbing lock to set up libevent");
+    std::unique_lock<std::mutex> tlk(tm);
+
     event_set_log_callback(LogCallback);
     event_set_fatal_callback(FatalCallback);
 
-    evthread_use_pthreads();
+    if (evthread_use_pthreads() != 0) {
+        Panic("Couldn't set up libevent + pthreads");
+    }
     libeventBase = event_base_new();
     evthread_make_base_notifiable(libeventBase);
 
@@ -235,6 +244,11 @@ DKUDPTransport::DKUDPTransport(double dropRate, double reorderRate,
     for (event *x : signalEvents) {
         event_add(x, NULL);
     }
+
+    setup_complete = true;
+    Notice("Done setting up libevent");
+    tlk.unlock();
+    tcv.notify_all();
 }
 
 DKUDPTransport::~DKUDPTransport()
@@ -403,6 +417,8 @@ DKUDPTransport::SendMessageInternal(TransportReceiver *src,
 void
 DKUDPTransport::Run()
 {
+    SetupLibevent();
+
     Debug("In the run loop.");
     // Pop an initial token and "register" the Demikernel check in libevent w/ timer. 
     demi_qtoken_t token = -1; 

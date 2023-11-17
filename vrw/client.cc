@@ -54,6 +54,11 @@ VRWClient::VRWClient(const Configuration &config,
     unloggedRequestTimeout = new Timeout(transport, 1000, [this]() {
             UnloggedRequestTimeoutCallback();
         });
+
+    std::unique_lock<std::mutex> tlk(transport->tm);
+    transport->tcv.wait(tlk, [this]{ return this->transport->setup_complete; });
+    tlk.unlock();
+    transport->tcv.notify_one();  // I think not necessary; transport is not waiting for the lock 
 }
 
 VRWClient::~VRWClient()

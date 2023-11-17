@@ -108,7 +108,7 @@ private:
     } reorderBuffer;
     int dscp;
 
-    event_base *libeventBase;
+    event_base *libeventBase = NULL;
     // std::vector<event *> listenerEvents;
     std::vector<event *> signalEvents;
     std::vector<demi_qtoken_t> tokens;
@@ -150,6 +150,7 @@ private:
     static void FatalCallback(int err);
     static void SignalCallback(evutil_socket_t qd,
                                short what, void *arg);
+    void SetupLibevent();
 };
 
 #endif  // _LIB_DKUDPTRANSPORT_H_

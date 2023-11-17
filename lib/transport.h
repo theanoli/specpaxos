@@ -33,8 +33,10 @@
 
 #include "lib/configuration.h"
 
+#include <condition_variable>
 #include <google/protobuf/message.h>
 #include <functional>
+#include <mutex>
 
 class TransportAddress
 {
@@ -68,6 +70,10 @@ class Transport
 protected:
     typedef ::google::protobuf::Message Message;
 public:
+    std::condition_variable tcv; 
+    std::mutex tm; 
+    bool setup_complete = false;
+
     virtual ~Transport() {}
     virtual void Register(TransportReceiver *receiver,
                           const specpaxos::Configuration &config,

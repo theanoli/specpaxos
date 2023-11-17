@@ -221,8 +221,9 @@ VRWReplica::CommitUpTo(opnum_t upto)
                 string host = transport->get_host(*iter->second);
                 string port = transport->get_port(*iter->second);
                 transport->Timer(0, [=]() {
-                transport->SendMessage(this, host, port, reply);
+		    transport->SendMessage(this, host, port, reply);
                 });
+		RNotice("Sent reply to the client.");
             }
         }
 
@@ -462,6 +463,12 @@ VRWReplica::LaunchReceiveThread()
 void
 VRWReplica::ReceiveLoop()
 {
+    // Wait until libevent is set up
+    std::unique_lock<std::mutex> tlk(transport->tm);
+    transport->tcv.wait(tlk, [this]{ return this->transport->setup_complete; });
+    tlk.unlock();
+    transport->tcv.notify_one();  // I think not necessary; transport is not waiting for the lock 
+
     RNotice("About to enter the receive loop");
     while (true) {
 	RNotice("Waiting on the receive queue to be populated");
@@ -471,11 +478,11 @@ VRWReplica::ReceiveLoop()
         auto next = std::move(receiveQueue.front());
         receiveQueue.pop();
 
-        RNotice("Processing a message: %s", std::get<1>(next).c_str());
-        ProcessReceivedMessage(*std::get<0>(next), std::get<1>(next), std::get<2>(next));
-
 	lk.unlock();
 	cv.notify_one();  // vs. notify_all? Shouldn't matter which one
+
+        RNotice("Processing a message: %s", std::get<1>(next).c_str());
+        ProcessReceivedMessage(*std::get<0>(next), std::get<1>(next), std::get<2>(next));
     }
 }
 
@@ -483,9 +490,11 @@ void
 VRWReplica::ReceiveMessage(const TransportAddress &remote,
                           const string &type, const string &data)
 {
+    RNotice("Waiting to grab lock on receive queue");
     std::unique_lock<std::mutex> lk(m);
     receiveQueue.push({std::unique_ptr<TransportAddress>(remote.clone()), 
             type, data});
+    lk.unlock();
     cv.notify_one();
 }
 
