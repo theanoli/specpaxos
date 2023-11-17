@@ -1,7 +1,9 @@
 #!/bin/bash
+REPO_ROOT=$(git rev-parse --show-toplevel)
+source ${REPO_ROOT}/scripts/test_paths.sh
 
-if [ $# -ne 4 ]; then 
-    echo "Wrong number of arguments! Need four: config_dir do_read_val nclient_machines nclient_threads"
+if [ $# -ne 8 ]; then 
+    echo "Wrong number of arguments! Need eight: config_dir do_read_val nclient_machines nclient_threads nshards output_log_dir measure_energy runtime"
     exit
 fi
 
@@ -31,8 +33,11 @@ trap 'failure ${LINENO} "$BASH_COMMAND"' ERR
 srcdir="$HOME/apiary/beehive-electrode/specpaxos-mod"
 #configdir="$srcdir/kvstore/configs/100gb_cluster"
 configdir=`realpath "$1"`
-logdir="${srcdir}/logs"
+logdir=$6
 keyspath="${srcdir}/kvstore/tools/keys"
+
+declare -A replicas_map
+
 
 # Machines on which replicas are running.
 # replicas=("198.0.0.5" "198.0.0.15" "198.0.0.13")  # 100gb
@@ -54,13 +59,15 @@ validate_reads=$2
 nclients=$3  # number of client machines to use
 nclient_threads=$4    # number of clients to run (per machine)
 nclient_procs=$((nclients * nclient_threads))
-nshard=4    # number of shards
+nshard=$5    # number of shards
 nkeys=1000 # number of keys to use
-rtime=30     # duration to run
+rtime=$8     # duration to run
 
 wper=10       # writes percentage
 err=0        # error
 zalpha=-1    # zipf alpha (-1 to disable zipf and enable uniform)
+
+measure_energy=$7
 
 # Print out configuration being used.
 echo "Configuration:"
@@ -76,14 +83,31 @@ echo "Zipf alpha: $zalpha"
 echo "Client: $client"
 echo "Mode: $mode"
 
-mkdir -p $srcdir/logs
+mkdir -p $logdir
+
+for ((i=0; i <$nshard; i++)) do
+    CONFIG_FILE="$configdir/shard$i.config"
+    # loop through the shard config file line by line, skipping the first line
+    while IFS= read -r line
+    do
+        # Get just the IP addresses using terrifying command substitution
+        HOST_IP=$(echo "${line}" | cut -f "2" -d ' ' | cut -f "1" -d ":")
+        echo "host ip is ${HOST_IP}"
+        # figure out whether it's an FPGA node or a CPU node
+        if [[ -n "${FPGA_IP_PCIE[${HOST_IP}]}" ]]; then
+            replicas_map["${HOST_IP}"]="fpga"
+        else
+            replicas_map["${HOST_IP}"]="cpu"
+        fi
+    done <<< "$(tail -n +2 ${CONFIG_FILE})"
+done
 
 # Distribute the config files to the client and host machines
 for host in ${clients[@]}
 do
   scp $configdir/*.config $host:$configdir
 done
-for host in ${replicas[@]}
+for host in ${!replicas_map[@]}
 do
   scp $configdir/*.config $host:$configdir
 done
@@ -113,6 +137,23 @@ done
 # Wait a bit for all replicas to start up
 sleep 2
 
+# Spawn energy measurement if we're going to do that
+if "$measure_energy"; then
+    echo "Starting energy measurement"
+    for replica in ${!replicas_map[@]}; do
+        if [[ "${replicas_map[${replica}]}" == "cpu" ]]; then
+            ENERGY_CMD="ssh $replica 'mkdir -p $logdir; cat ${SUDO_PASSWD_FILE} | taskset -c 16 sudo -S $srcdir/kvstore/tools/poll_rapl/rapl-poll -o $logdir/energy_$replica.out -d  $(($rtime + 30)) -p 1 -m 0' &"
+            echo "$ENERGY_CMD"
+            eval "$ENERGY_CMD"
+        else
+            FPGA_PCIE=${FPGA_IP_PCIE[${replica}]}
+            ENERGY_CMD="ssh $replica 'mkdir -p $logdir; cat ${SUDO_PASSWD_FILE} | sudo -S $BEEHIVE_REPO_ROOT/corundum_fpga/utils/just_power -d ${FPGA_PCIE} -o $logdir/energy_$replica.out -t $(($rtime + 30)) -p 0.1 &'"
+            echo "$ENERGY_CMD &"
+            eval "$ENERGY_CMD &"
+        fi
+
+    done
+fi
 
 # Run the clients
 echo "Running the client(s)"
@@ -121,7 +162,7 @@ client_count=1
 for host in ${clients[@]}
 do
   echo "Running clients on ${host}"
-  ssh $host "cd $srcdir; mkdir -p $srcdir/logs; $srcdir/kvstore/tools/start_client.sh \"$srcdir/kvstore/$client \
+  ssh $host "cd $srcdir; mkdir -p $logdir; $srcdir/kvstore/tools/start_client.sh \"$srcdir/kvstore/$client \
   -c $configdir/shard -N $nshard -f $srcdir/kvstore/tools/keys \
   -d $rtime -w $wper -k $nkeys -m $mode -e $err -z $zalpha\" \
   $count $nclient_threads $logdir" &
@@ -139,12 +180,28 @@ echo "Waiting for client(s) to exit"
 client_count=1
 for host in ${clients[@]}
 do
-  ssh $host "$srcdir/kvstore/tools/wait_client.sh $client"
+  ssh $host "$srcdir/kvstore/tools/wait_client.sh $client $USER"
   client_count=$((client_count+1))
   if [ $client_count -gt $nclients ]; then
 	  break
   fi
 done
+
+echo "All clients done"
+
+# Make sure all energy measurements finish and get logs
+if "$measure_energy"; then
+    echo "Waiting for energy"
+    for replica in ${!replicas_map[@]}; do
+        if [[ "${replicas_map[${replica}]}" == "cpu" ]]; then
+            ssh $replica "$srcdir/kvstore/tools/wait_client.sh rapl-poll root" 
+        else
+            ssh $replica "$srcdir/kvstore/tools/wait_client.sh just_power root" 
+        fi
+        rsync -ave "ssh" $replica:"$logdir/energy_$replica.out" $logdir
+        ssh $replica "rm $logdir/energy_$replica.out"
+    done
+fi
 
 
 # Kill all replicas
@@ -183,4 +240,3 @@ do
 done
 rm -f $logdir/client.*.log
 
-python3 $srcdir/kvstore/tools/process_logs.py $logdir/client.log $rtime
