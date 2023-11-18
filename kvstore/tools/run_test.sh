@@ -30,7 +30,7 @@ failure() {
 trap 'failure ${LINENO} "$BASH_COMMAND"' ERR
 
 # Paths to source code and logfiles.
-srcdir="$HOME/apiary/beehive-electrode/specpaxos-mod"
+srcdir="$HOME/specpaxos"
 #configdir="$srcdir/kvstore/configs/100gb_cluster"
 configdir=`realpath "$1"`
 logdir=$6

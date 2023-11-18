@@ -17,17 +17,17 @@ NUM_CLIENT_MACHINES=(
 )
 
 NUM_MACHINE_THREADS=(
-#    1
-#    2
-#    4
-#    6
-#    8
-#    10
-#    12
-#    16
-#    24
-#    32
-#    64
+    1
+    2
+    4
+    6
+    8
+    10
+    12
+    16
+    24
+    32
+    64
     96
     128
 )
@@ -40,7 +40,7 @@ NUM_SHARDS=(
 )
 
 SCRIPTS_PATH="${REPO_ROOT}/kvstore/tools"
-RESULT_DIR="${REPO_ROOT}/results_irqs"
+RESULT_DIR="${REPO_ROOT}/results_irqs_power"
 CONFIG_PATH="${REPO_ROOT}/kvstore/configs"
 COLLECTED_RESULTS_FILE="${RESULT_DIR}/collected_results.csv"
 
