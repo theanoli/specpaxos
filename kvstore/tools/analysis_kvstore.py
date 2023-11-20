@@ -67,8 +67,7 @@ def process_file(filepath):
         if status == 1:
             sLatency.append(latency)
             sExtra += extra
-            if ttype == 0 or ttype == 1:
-                readWrites.append(ttype)
+            readWrites.append(ttype)
             
         else:
             fLatency.append(latency)

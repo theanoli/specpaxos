@@ -62,6 +62,7 @@ sleep 3
 
 # do the run
 echo "*** *** STARTING RUNNING"
+echo ./run_simple_clients.sh "$CONFIG" $NUM_THREADS $RUNTIME $outfile $PAYLOAD_SIZE $WARMUP_PERIOD  '>>' "$logdir/$destfile,$tn,$runNum,.stdout" '2>>' "$logdir/$destfile,$tn,$runNum,.stderr"
 ./run_simple_clients.sh "$CONFIG" $NUM_THREADS $RUNTIME $outfile $PAYLOAD_SIZE $WARMUP_PERIOD  >> "$logdir/$destfile,$tn,$runNum,.stdout" 2>> "$logdir/$destfile,$tn,$runNum,.stderr"
 echo "*** *** FINISHED RUNNING"
 
