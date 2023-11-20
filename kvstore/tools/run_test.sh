@@ -65,7 +65,7 @@ rtime=$8     # duration to run
 
 wper=10       # writes percentage
 err=0        # error
-zalpha=0.9    # zipf alpha (-1 to disable zipf and enable uniform)
+zalpha=-1    # zipf alpha (-1 to disable zipf and enable uniform)
 
 measure_energy=$7
 
