@@ -1,9 +1,11 @@
 #!/bin/bash
 set -e 
-if [ $# -ne 1 ]; then 
-    echo "Wrong number of arguments! Need <run> or <collect>"
+if [ $# -ne 2 ]; then 
+    echo "Wrong number of arguments! Need <run> or <collect>, then VERSION"
     exit
 fi
+
+VERSION=$2
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 CONFIG_DIRS=(
@@ -12,35 +14,38 @@ CONFIG_DIRS=(
 )
 
 NUM_CLIENT_MACHINES=(
-    1
+    #1
     2
 )
 
 NUM_MACHINE_THREADS=(
-    1
-    2
-    4
-    6
-    8
-    10
-    12
-    16
-    24
-    32
-    64
-    96
-    128
+    #1
+    #2
+    #4
+    #6
+    #8
+    #10
+    #12
+    #16
+    #24
+    #32
+    #64
+    #96
+    #128
+    192
+    #256
+    #512
 )
 
 NUM_SHARDS=(
-    1
-    2
+    #1
+    #2
     3
-    4
+    #4
 )
 
 SCRIPTS_PATH="${REPO_ROOT}/kvstore/tools"
-RESULT_DIR="${REPO_ROOT}/results_irqs_power"
+RESULT_DIR="${REPO_ROOT}/kvstore/results/${VERSION}"
 CONFIG_PATH="${REPO_ROOT}/kvstore/configs"
 COLLECTED_RESULTS_FILE="${RESULT_DIR}/collected_results.csv"
 
@@ -49,6 +54,25 @@ MEASURE_ENERGY=true
 
 runBenchmark() {
     mkdir -p ${RESULT_DIR}
+
+    echo "Enabling IRQs..."
+    _cpuconfigdir=../configs/100gb_cluster
+    _replicas=$(cat "$_cpuconfigdir"/shard0.config | tail -n+2 | cut -d' ' -f2 | cut -d':' -f1)
+    for replica in $_replicas; do
+        ssh $replica "cd `pwd`; cat ../../scripts/passwd | sudo -S ./set_irqs.sh "'`ifconfig | grep 198.0.0. -B1 | head -n1 | cut -d: -f1` 1'
+    done
+
+    echo "Locking CPU Frequencies..."
+    ./lock_all.sh lock
+
+    echo "Disabling turbo..."
+    for replica in $_replicas; do
+        ssh $replica "cd `pwd`; cat ../../scripts/passwd | sudo -S ./turbo_boosting.sh disable"
+    done
+
+    echo "Sleeping..."
+    sleep 5 # wait for CPUs to cool down
+
 
     for CONFIG in "${CONFIG_DIRS[@]}"; do
         for SHARDS in "${NUM_SHARDS[@]}"; do
@@ -84,6 +108,17 @@ runBenchmark() {
                 done
             done
         done
+    done
+
+    echo "Disabling IRQs..."
+    for replica in $_replicas; do
+        ssh $replica "cd `pwd`; cat ../../scripts/passwd | sudo -S ./set_irqs.sh "'`ifconfig | grep 198.0.0. -B1 | head -n1 | cut -d: -f1` 2'
+    done
+    echo "Unlocking CPU Frequencies..."
+    ./lock_all.sh restore
+    echo "Enabling turbo..."
+    for replica in $_replicas; do
+        ssh $replica "cd `pwd`; cat ../../scripts/passwd | sudo -S ./turbo_boosting.sh enable"
     done
 }
 
