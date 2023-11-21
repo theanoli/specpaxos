@@ -3,7 +3,7 @@
 
 LOCK=$1 # either lock or restore
 
-SHARDS_MAX=4
+SHARDS_MAX=$2 # 1 thru 4
 CLIENT_CORES=32
 
 configdir=../configs/100gb_cluster

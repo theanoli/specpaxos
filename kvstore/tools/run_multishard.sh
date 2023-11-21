@@ -19,29 +19,29 @@ NUM_CLIENT_MACHINES=(
 )
 
 NUM_MACHINE_THREADS=(
-    #1
-    #2
-    #4
-    #6
-    #8
-    #10
-    #12
-    #16
-    #24
-    #32
-    #64
-    #96
-    #128
+    1
+    2
+    4
+    6
+    8
+    10
+    12
+    16
+    24
+    32
+    64
+    96
+    128
     192
-    #256
-    #512
+    256
+    512
 )
 
 NUM_SHARDS=(
-    #1
-    #2
+    1
+    2
     3
-    #4
+    4
 )
 
 SCRIPTS_PATH="${REPO_ROOT}/kvstore/tools"
@@ -62,20 +62,21 @@ runBenchmark() {
         ssh $replica "cd `pwd`; cat ../../scripts/passwd | sudo -S ./set_irqs.sh "'`ifconfig | grep 198.0.0. -B1 | head -n1 | cut -d: -f1` 1'
     done
 
-    echo "Locking CPU Frequencies..."
-    ./lock_all.sh lock
-
     echo "Disabling turbo..."
     for replica in $_replicas; do
         ssh $replica "cd `pwd`; cat ../../scripts/passwd | sudo -S ./turbo_boosting.sh disable"
     done
 
-    echo "Sleeping..."
-    sleep 5 # wait for CPUs to cool down
-
-
     for CONFIG in "${CONFIG_DIRS[@]}"; do
         for SHARDS in "${NUM_SHARDS[@]}"; do
+
+            echo "Locking CPU Frequencies..."
+            ./lock_all.sh lock $SHARDS
+
+            echo "Sleeping..."
+            sleep 5 # wait for CPUs to cool down
+
+
             for CLIENT_MACHINES in "${NUM_CLIENT_MACHINES[@]}"; do
                 for MACHINE_THREADS in "${NUM_MACHINE_THREADS[@]}"; do
                     energy_files=0
@@ -107,6 +108,8 @@ runBenchmark() {
                     fi
                 done
             done
+            echo "Unlocking CPU Frequencies..."
+            ./lock_all.sh restore 4
         done
     done
 
@@ -114,8 +117,6 @@ runBenchmark() {
     for replica in $_replicas; do
         ssh $replica "cd `pwd`; cat ../../scripts/passwd | sudo -S ./set_irqs.sh "'`ifconfig | grep 198.0.0. -B1 | head -n1 | cut -d: -f1` 2'
     done
-    echo "Unlocking CPU Frequencies..."
-    ./lock_all.sh restore
     echo "Enabling turbo..."
     for replica in $_replicas; do
         ssh $replica "cd `pwd`; cat ../../scripts/passwd | sudo -S ./turbo_boosting.sh enable"
