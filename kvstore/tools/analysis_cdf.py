@@ -103,11 +103,11 @@ def main2():
     print(rightL)
     right = max(rightL)
 
-    #graph(df, m2, 'raw data', 'value', 'source',
-                        #'Latency (us), 'CDF', 'Device', sortX=False, right=right, markersize=0)
-
     graph(df, m2, 'raw data', 'value', 'source',
-                        'Latency (us) (log scale)', 'CDF', 'Device', sortX=False, markersize=0, xscale="log", extra_title="log", left=10)
+                        'Latency (us)', 'CDF', 'Device', sortX=False, right=right, markersize=0)
+
+    #graph(df, m2, 'raw data', 'value', 'source',
+                        #'Latency (us)', 'CDF', 'Device', sortX=False, markersize=0, left=10)
     # zoomed in graph
     left = min(map(lambda x: calcRight(x, 0.95, "left"), [df2, df3]))
     df = df.loc[df["value"] >= 0.95].reset_index(drop=True)
@@ -140,5 +140,5 @@ def across_clients():
 
 if __name__ == '__main__':
     #main()
-    #main2()
-    across_clients()
+    main2()
+    #across_clients()

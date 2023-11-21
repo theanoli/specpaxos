@@ -60,7 +60,8 @@ def calcRight(df, cutoff, direction="right"):
     return right
 
 def main2():
-    pathstring = '/home/katie/apiary/beehive-electrode/specpaxos-mod/{version}/{config}_{shards}shard_{clientnodes}clientnodes_{threads}threads/client{suffix}'
+    #pathstring = '/home/katie/apiary/beehive-electrode/specpaxos-mod/{version}/{config}_{shards}shard_{clientnodes}clientnodes_{threads}threads/client{suffix}'
+    pathstring = '/scratch/katie/{version}/{config}_{shards}shard_{clientnodes}clientnodes_{threads}threads/client{suffix}'
     config2 = sys.argv[1]
     version2 = sys.argv[2]
     config3 = sys.argv[3]
@@ -85,8 +86,8 @@ def main2():
     graph(df, m2, 'raw data', 'value', 'source',
                         'Latency (us)', 'CDF', 'Device', sortX=False, right=right, markersize=0)
 
-    graph(df, m2, 'raw data', 'value', 'source',
-                        'Latency (us) (log scale)', 'CDF', 'Device', sortX=False, markersize=0, xscale="log", extra_title="log", left=10)
+    #graph(df, m2, 'raw data', 'value', 'source',
+                        #'Latency (us) (log scale)', 'CDF', 'Device', sortX=False, markersize=0, xscale="log", extra_title="log", left=10)
     # zoomed in graph
     left = min(map(lambda x: calcRight(x, 0.95, "left"), [df2, df3]))
     df = df.loc[df["value"] >= 0.95].reset_index(drop=True)
