@@ -4,7 +4,9 @@
 
 Command: `analysis_katie_cdf.py 100gb_cluster results_ondemand fpga_cluster results_ondemand`
 
-Output file name: results_ondemand,config,4,2,2,raw data vs value vs source,Stats:
+Output file name: results_ondemand,config,4,2,2,raw data vs value vs source,
+
+Stats:
 
 Median latency CPU: 150
 
