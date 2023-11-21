@@ -7,6 +7,7 @@ from fileio import FileIO, collapse
 import numpy as np
 import pandas as pd
 
+import urllib.parse
 from pathlib import Path
 
 import re
@@ -51,6 +52,7 @@ def analyze_cdf(config, version, pathstring, output=True):
         print(df.head())
         graph(df, meta, 'raw data', 'value', 'variable',
                         'Latency (us)', 'CDF', 'Variable', markersize=0)
+
     return df, meta
 
 def calcRight(df, cutoff, direction="right"):
@@ -76,25 +78,57 @@ def main2():
     df3["source"] = "FPGA"
 
     #df = pd.concat([df1, df2, df3]).reset_index(drop=True)
+    df2 = df2.loc[df2["variable"] == "ops"].reset_index(drop=True)
+    df3 = df3.loc[df3["variable"] == "ops"].reset_index(drop=True)
     df = pd.concat([df2, df3]).reset_index(drop=True)
-    df = df.loc[df["variable"] == "ops"].reset_index(drop=True)
+    #df = df.loc[df["variable"] == "ops"].reset_index(drop=True)
 
     rightL = list(map(lambda x: calcRight(x, 0.99), [df2, df3]))
-    print(rightL)
+    #print(rightL)
     right = max(rightL)
 
-    graph(df, m2, 'raw data', 'value', 'source',
+    zoomedOut = graph(df, m2, 'raw data', 'value', 'source',
                         'Latency (us)', 'CDF', 'Device', sortX=False, right=right, markersize=0)
 
     #graph(df, m2, 'raw data', 'value', 'source',
                         #'Latency (us) (log scale)', 'CDF', 'Device', sortX=False, markersize=0, xscale="log", extra_title="log", left=10)
     # zoomed in graph
-    left = min(map(lambda x: calcRight(x, 0.95, "left"), [df2, df3]))
-    df = df.loc[df["value"] >= 0.95].reset_index(drop=True)
+    leftL = list(map(lambda x: calcRight(x, 0.95, "left"), [df2, df3]))
+    left = min(leftL)
+    #df = df.loc[df["value"] >= 0.95].reset_index(drop=True)
     print(df.head())
-    graph(df, m2, 'raw data', 'value', 'source',
+    zoomedIn = graph(df, m2, 'raw data', 'value', 'source',
                         'Latency (us) (log scale)', 'CDF', 'Device', sortX=False, bottom=None, left=left, xscale="log", extra_title="zoomed")
+    
+    medianL = list(map(lambda x: calcRight(x, 0.5), [df2, df3]))
+    output = ["Stats:"]
+    output += [f"Median latency CPU: {medianL[0]}"]
+    output += [f"95% latency CPU: {leftL[0]}"]
+    output += [f"99% latency CPU: {rightL[0]}"]
+    output += [f"Max latency CPU: {df2['raw data'].iloc[-1]}"]
 
+    output += [f"Median latency FPGA: {medianL[1]}"]
+    output += [f"95% latency FPGA: {leftL[1]}"]
+    output += [f"99% latency FPGA: {rightL[1]}"]
+    output += [f"Max latency FPGA: {df3['raw data'].iloc[-1]}"]
+    
+    print("\n".join(output))
+
+    if input("Do you want to write this to the markdown file? Y/n: ").lower() == "y":
+        mfilename = "Graphs.md"
+        zoomedOutSer = urllib.parse.quote(zoomedOut)
+        zoomedInSer = urllib.parse.quote(zoomedIn)
+        with open(mfilename, 'a') as mfile:
+            mfile.write(f"![{zoomedOut}](graphs/{zoomedOutSer}.png)\n\n")
+            mfile.write(f"![{zoomedIn}](graphs/{zoomedInSer}.png)\n\n")
+            mfile.write(f"Command: `{' '.join(sys.argv)}`\n\n")
+            mfile.write(f"Output file name: {zoomedOut}\n\n")
+            mfile.write("\n\n".join(output))
+            mfile.write("\n\n\n\n")
+
+        print(f"Done. You should run:")
+        print(f"git add -f Graphs.md 'graphs/{zoomedOut}.png' 'graphs/{zoomedIn}.png' 'pdfs/{zoomedOut}.pdf' 'pdfs/{zoomedIn}.pdf'")
+        print(f"git commit -m 'Update graphs'")
 
 if __name__ == '__main__':
     #main()
