@@ -180,7 +180,9 @@ echo "Waiting for client(s) to exit"
 client_count=1
 for host in ${clients[@]}
 do
-  ssh $host "$srcdir/kvstore/tools/wait_client.sh $client $USER"
+  echo "Waiting for client $host:"
+  ssh $host "$srcdir/kvstore/tools/wait_client.sh $client"
+  echo "Host $host is done."
   client_count=$((client_count+1))
   if [ $client_count -gt $nclients ]; then
 	  break

@@ -5,6 +5,7 @@ user=$2
 check=1
 while [ $check -gt 0 ]
 do
-    check=`pgrep -u $user -x $procname | wc -l`
-    sleep 1
+    echo Checking for $procname...
+    check=`pgrep -x $procname | wc -l`
+    sleep 3
 done

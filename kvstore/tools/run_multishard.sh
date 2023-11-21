@@ -67,8 +67,10 @@ runBenchmark() {
         ssh $replica "cd `pwd`; cat ../../scripts/passwd | sudo -S ./turbo_boosting.sh disable"
     done
 
-    for CONFIG in "${CONFIG_DIRS[@]}"; do
         for SHARDS in "${NUM_SHARDS[@]}"; do
+
+            echo "Unlocking CPU Frequencies..."
+            ./lock_all.sh restore 4
 
             echo "Locking CPU Frequencies..."
             ./lock_all.sh lock $SHARDS
@@ -79,6 +81,7 @@ runBenchmark() {
 
             for CLIENT_MACHINES in "${NUM_CLIENT_MACHINES[@]}"; do
                 for MACHINE_THREADS in "${NUM_MACHINE_THREADS[@]}"; do
+    for CONFIG in "${CONFIG_DIRS[@]}"; do
                     energy_files=0
                     while [ $energy_files -ne 3 ]; do
                         echo "Running ${CONFIG} with ${SHARDS} shards on ${CLIENT_MACHINES} client nodes with ${MACHINE_THREADS} per node"
@@ -108,8 +111,6 @@ runBenchmark() {
                     fi
                 done
             done
-            echo "Unlocking CPU Frequencies..."
-            ./lock_all.sh restore 4
         done
     done
 
@@ -117,6 +118,8 @@ runBenchmark() {
     for replica in $_replicas; do
         ssh $replica "cd `pwd`; cat ../../scripts/passwd | sudo -S ./set_irqs.sh "'`ifconfig | grep 198.0.0. -B1 | head -n1 | cut -d: -f1` 2'
     done
+    echo "Unlocking CPU Frequencies..."
+    ./lock_all.sh restore 4
     echo "Enabling turbo..."
     for replica in $_replicas; do
         ssh $replica "cd `pwd`; cat ../../scripts/passwd | sudo -S ./turbo_boosting.sh enable"
